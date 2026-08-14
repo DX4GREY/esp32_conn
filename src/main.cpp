@@ -45,8 +45,13 @@
  * JIKA TIDAK ADA PERINTAH, MODE DEFAULT: AGGRESSIVE + RANDHOP + STORM = ON
  */
 
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7735.h>
 #include <SPI.h>
 #include <RF24.h>
+
+// Fehlende ST77XX-Grau-Konstante (RGB565 -> ausgewogene Graustufe ~50%)
+#define ST77XX_GRAY 0x8410
 
 // ============ PIN DEFINISI ============
 #define CE_PIN   7
@@ -64,7 +69,24 @@
 #define MAX_DWELL_US        1000
 #define DEFAULT_DWELL_US    10            // 10 µs untuk agresif
 
-// ===== PRESET BAND TARGET (frekuensi = 2400 + RF24 channel MHz) =====
+// ============ KONFIGURASI DISPLAY TFT 1.8' ============
+#define TFT_SCK   18
+#define TFT_SDA   17
+#define TFT_AO    16
+#define TFT_RST   15
+#define TFT_CS    14
+
+// ============ OBJEK TFT ============
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST);
+unsigned long lastDisplayUpdate = 0;
+
+// ============ PIN TOMBOL ============
+#define BTN_UP    11
+#define BTN_RIGHT 10
+#define BTN_DOWN  9
+#define BTN_B     5
+
+// ===== PRESET BAND TARGET  (frekuensi = 2400 + RF24 channel MHz) =====
 #define WIFI_MIN_CH         1     // 2401 MHz - awal band Wi-Fi (ch 1-13)
 #define WIFI_MAX_CH         73    // 2473 MHz - akhir band Wi-Fi
 #define BT_MIN_CH           2     // 2402 MHz - awal band Bluetooth
@@ -93,6 +115,8 @@ int hopMax = MAX_CHANNEL;
 String targetBand = "ALL";      // Kategori target: ALL / WIFI / BT / BLE-ADV
 const int bleAdvCh[3] = {2, 26, 80};  // 3 kanal advertising BLE (2402/2426/2480 MHz)
 
+const unsigned long DISPLAY_INTERVAL = 200; // ms
+
 // ============ BUFFER UNTUK PACKET STORM ============
 uint8_t randomPayload[32];
 uint8_t pipeAddress[5] = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7}; // dummy
@@ -110,6 +134,52 @@ void applyRadioConfig();
 void jamLoop();
 void generateRandomPayload();
 void IRAM_ATTR watchdogISR();
+void processUI();
+void updateUI();
+
+// ============ STATE UI ============
+enum MenuState {
+  MAIN_MENU,
+  SUB_CHANNEL,
+  SUB_POWER,
+  SUB_RATE,
+  SUB_AGGRESSIVE,
+  SUB_TURBO,
+  SUB_STORM,
+  SUB_RANDHOP,
+  SUB_BLAST,
+  SUB_HOPDWELL,
+  SUB_HOPRANGE,
+  SUB_BAND,
+  SUB_STATUS
+};
+
+MenuState currentState = MAIN_MENU;
+int menuIndex = 0;           // indeks item menu utama
+int subOption = 0;           // untuk pilihan dalam submenu (misal power, rate, band)
+int editValue = 0;           // untuk mengedit angka (channel, hopdwell)
+int editMin = 0, editMax = 0;// untuk hoprange (nilai sementara)
+
+const char* mainMenuItems[] = {
+  "Start/Stop",
+  "Channel",
+  "Power",
+  "Rate",
+  "Aggressive",
+  "Turbo",
+  "Storm",
+  "RandHop",
+  "Blast",
+  "HopDwell",
+  "HopRange",
+  "Band",
+  "Status"
+};
+const int mainMenuCount = 13;
+
+bool needRedraw = true;
+unsigned long lastButtonCheck = 0;
+const unsigned long BUTTON_DEBOUNCE = 50; // ms
 
 // ============================================
 // SETUP
@@ -117,7 +187,20 @@ void IRAM_ATTR watchdogISR();
 void setup() {
     Serial.begin(115200);
     delay(500);
+    // Inisialisasi tombol (pull-up internal, aktif LOW)
+    pinMode(BTN_UP, INPUT_PULLUP);
+    pinMode(BTN_RIGHT, INPUT_PULLUP);
+    pinMode(BTN_DOWN, INPUT_PULLUP);
+    pinMode(BTN_B, INPUT_PULLUP);
     Serial.println("Type 'help' for command list.");
+
+    tft.initR(INITR_BLACKTAB);   // untuk ST7735 128x160
+    tft.setRotation(3);          // Landscape terbalik 180° agar posisi display benar (1 = terbalik)
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    tft.setTextSize(1);
+    tft.setCursor(0, 0);
+    tft.println("RF24 JAMMER");
 
     // Inisialisasi SPI
     SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, CSN_PIN);
@@ -153,6 +236,44 @@ void setup() {
     timerAlarmEnable(watchdogTimer);
 }
 
+// ============ FUNGSI TOMBOL ============
+int readButton(int pin) {
+  static unsigned long lastTime[4] = {0,0,0,0};
+  static int lastState[4] = {HIGH, HIGH, HIGH, HIGH};
+  int idx;
+  if (pin == BTN_UP) idx = 0;
+  else if (pin == BTN_RIGHT) idx = 1;
+  else if (pin == BTN_DOWN) idx = 2;
+  else if (pin == BTN_B) idx = 3;
+  else return HIGH;
+
+  int state = digitalRead(pin);
+  if (state != lastState[idx]) {
+    lastTime[idx] = millis();
+  }
+  if ((millis() - lastTime[idx]) > BUTTON_DEBOUNCE) {
+    lastState[idx] = state;
+    return state;
+  }
+  return lastState[idx];
+}
+
+// Fungsi untuk mendeteksi tekan (transisi HIGH->LOW)
+bool buttonPressed(int pin) {
+  static int prevState[4] = {HIGH, HIGH, HIGH, HIGH};
+  int idx;
+  if (pin == BTN_UP) idx = 0;
+  else if (pin == BTN_RIGHT) idx = 1;
+  else if (pin == BTN_DOWN) idx = 2;
+  else if (pin == BTN_B) idx = 3;
+  else return false;
+  
+  int state = readButton(pin);
+  bool pressed = (prevState[idx] == HIGH && state == LOW);
+  prevState[idx] = state;
+  return pressed;
+}
+
 // ============================================
 // LOOP UTAMA
 // ============================================
@@ -174,11 +295,431 @@ void loop() {
         delay(10);
     }
 
+    // Proses UI dan tombol
+    processUI();
+    updateUI();  // Hanya menggambar jika needRedraw true
+
     // Jika watchdog trigger, restart otomatis (tidak terjadi jika loop berjalan)
     if (watchdogTriggered) {
         Serial.println("WATCHDOG TRIGGERED! Restarting...");
         ESP.restart();
     }
+}
+
+// ============================================
+// UI DISPLAY
+// ============================================
+void drawMainMenu() {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 0);
+  tft.setTextSize(1);
+  tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+  tft.println("=== RF24 JAMMER ===");
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  
+  int start = 0;
+  int visible = 10; // jumlah item yang bisa ditampilkan sekaligus
+  if (menuIndex >= visible) start = menuIndex - visible + 1;
+  int end = start + visible;
+  if (end > mainMenuCount) end = mainMenuCount;
+
+  for (int i = start; i < end; i++) {
+    tft.setCursor(0, 20 + (i - start) * 12);
+    if (i == menuIndex) {
+      tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+      tft.print("> ");
+    } else {
+      tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+      tft.print("  ");
+    }
+    tft.print(mainMenuItems[i]);
+    // Tampilkan status singkat di samping item
+    if (i == 0) {
+      tft.print(": ");
+      tft.println(jamming ? "ACT" : "STP");
+    } else if (i == 1) {
+      tft.print(": ");
+      tft.println(currentChannel);
+    } else if (i == 2) {
+      tft.print(": ");
+      tft.println(powerStr);
+    } else if (i == 3) {
+      tft.print(": ");
+      tft.println(rateStr);
+    } else if (i == 4) {
+      tft.print(": ");
+      tft.println(aggressiveMode ? "ON" : "OFF");
+    } else if (i == 5) {
+      tft.print(": ");
+      tft.println(turboMode ? "ON" : "OFF");
+    } else if (i == 6) {
+      tft.print(": ");
+      tft.println(stormMode ? "ON" : "OFF");
+    } else if (i == 7) {
+      tft.print(": ");
+      tft.println(randomHop ? "ON" : "OFF");
+    } else if (i == 8) {
+      tft.print(": ");
+      tft.println(blastMode ? "ON" : "OFF");
+    } else if (i == 9) {
+      tft.print(": ");
+      tft.println(hopDwell);
+    } else if (i == 10) {
+      tft.print(": ");
+      tft.print(hopMin);
+      tft.print("-");
+      tft.println(hopMax);
+    } else if (i == 11) {
+      tft.print(": ");
+      tft.println(targetBand);
+    } else if (i == 12) {
+      // Status - hanya teks
+    }
+  }
+  // Informasi navigasi
+  tft.setCursor(0, 150);
+  tft.setTextColor(0x8410, ST77XX_BLACK);
+  tft.print("UP/DN SEL RTN");
+}
+
+void drawSubMenu(int type, const char* title, const char** options, int optCount, int selected) {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 0);
+  tft.setTextSize(1);
+  tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+  tft.print(title);
+  tft.println(":");
+  
+  for (int i = 0; i < optCount; i++) {
+    tft.setCursor(0, 20 + i * 12);
+    if (i == selected) {
+      tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+      tft.print("> ");
+    } else {
+      tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+      tft.print("  ");
+    }
+    tft.println(options[i]);
+  }
+  tft.setCursor(0, 150);
+  tft.setTextColor(0x8410, ST77XX_BLACK);
+  tft.print("UP/DN SELECT, B=back");
+}
+
+void drawEditNumber(const char* title, int value, int minVal, int maxVal) {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 0);
+  tft.setTextSize(1);
+  tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+  tft.println(title);
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  tft.setCursor(0, 30);
+  tft.print("Value: ");
+  tft.println(value);
+  tft.setCursor(0, 60);
+  tft.print("Range: ");
+  tft.print(minVal);
+  tft.print(" - ");
+  tft.println(maxVal);
+  tft.setCursor(0, 150);
+  tft.setTextColor(0x8410, ST77XX_BLACK);
+  tft.print("UP/DN change, RT=set, B=back");
+}
+
+void updateUI() {
+  if (!needRedraw) return;
+  needRedraw = false;
+  
+  switch (currentState) {
+    case MAIN_MENU:
+      drawMainMenu();
+      break;
+    case SUB_CHANNEL:
+      drawEditNumber("Channel", editValue, MIN_CHANNEL, MAX_CHANNEL);
+      break;
+    case SUB_POWER: {
+      const char* opts[] = {"MAX", "HIGH", "LOW", "MIN"};
+      drawSubMenu(SUB_POWER, "Power", opts, 4, subOption);
+      break;
+    }
+    case SUB_RATE: {
+      const char* opts[] = {"250KBPS", "1MBPS", "2MBPS"};
+      drawSubMenu(SUB_RATE, "Rate", opts, 3, subOption);
+      break;
+    }
+    case SUB_AGGRESSIVE: {
+      const char* opts[] = {"OFF", "ON"};
+      drawSubMenu(SUB_AGGRESSIVE, "Aggressive", opts, 2, aggressiveMode ? 1 : 0);
+      break;
+    }
+    case SUB_TURBO: {
+      const char* opts[] = {"OFF", "ON"};
+      drawSubMenu(SUB_TURBO, "Turbo", opts, 2, turboMode ? 1 : 0);
+      break;
+    }
+    case SUB_STORM: {
+      const char* opts[] = {"OFF", "ON"};
+      drawSubMenu(SUB_STORM, "Storm", opts, 2, stormMode ? 1 : 0);
+      break;
+    }
+    case SUB_RANDHOP: {
+      const char* opts[] = {"OFF", "ON"};
+      drawSubMenu(SUB_RANDHOP, "RandHop", opts, 2, randomHop ? 1 : 0);
+      break;
+    }
+    case SUB_BLAST: {
+      const char* opts[] = {"OFF", "ON"};
+      drawSubMenu(SUB_BLAST, "Blast", opts, 2, blastMode ? 1 : 0);
+      break;
+    }
+    case SUB_HOPDWELL:
+      drawEditNumber("HopDwell (us)", editValue, MIN_DWELL_US, MAX_DWELL_US);
+      break;
+    case SUB_HOPRANGE: {
+      tft.fillScreen(ST77XX_BLACK);
+      tft.setCursor(0, 0);
+      tft.setTextSize(1);
+      tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+      tft.println("HopRange");
+      tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+      tft.setCursor(0, 30);
+      tft.print("Min: ");
+      tft.println(editMin);
+      tft.setCursor(0, 50);
+      tft.print("Max: ");
+      tft.println(editMax);
+      tft.setCursor(0, 100);
+      tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+      tft.println("UP/DN change, RT=set, B=back");
+      break;
+    }
+    case SUB_BAND: {
+      const char* opts[] = {"ALL", "WIFI", "BT", "BLEADV"};
+      int sel = 0;
+      if (targetBand == "ALL") sel = 0;
+      else if (targetBand == "WIFI") sel = 1;
+      else if (targetBand == "BT") sel = 2;
+      else if (targetBand == "BLE-ADV") sel = 3;
+      drawSubMenu(SUB_BAND, "Band", opts, 4, sel);
+      break;
+    }
+    case SUB_STATUS: {
+      tft.fillScreen(ST77XX_BLACK);
+      tft.setCursor(0, 0);
+      tft.setTextSize(1);
+      tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+      tft.println("=== STATUS ===");
+      tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+      tft.print("Jamming : "); tft.println(jamming ? "ACTIVE" : "STOPPED");
+      tft.print("Channel : "); tft.println(currentChannel);
+      tft.print("Power   : "); tft.println(powerStr);
+      tft.print("Rate    : "); tft.println(rateStr);
+      tft.print("Aggr    : "); tft.println(aggressiveMode ? "ON" : "OFF");
+      tft.print("Turbo   : "); tft.println(turboMode ? "ON" : "OFF");
+      tft.print("Storm   : "); tft.println(stormMode ? "ON" : "OFF");
+      tft.print("RandHop : "); tft.println(randomHop ? "ON" : "OFF");
+      tft.print("Blast   : "); tft.println(blastMode ? "ON" : "OFF");
+      tft.print("Dwell   : "); tft.println(hopDwell);
+      tft.print("Range   : "); tft.print(hopMin); tft.print("-"); tft.println(hopMax);
+      tft.print("Band    : "); tft.println(targetBand);
+      tft.setCursor(0, 150);
+      tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+      tft.print("Press B to return");
+      break;
+    }
+    default: break;
+  }
+}
+
+// ============================================
+// PROSES UI (tombol)
+// ============================================
+void processUI() {
+  // Cek tombol
+  if (buttonPressed(BTN_UP)) {
+    if (currentState == MAIN_MENU) {
+      menuIndex = (menuIndex - 1 + mainMenuCount) % mainMenuCount;
+      needRedraw = true;
+    } else if (currentState == SUB_CHANNEL) {
+      editValue = constrain(editValue + 1, MIN_CHANNEL, MAX_CHANNEL);
+      needRedraw = true;
+    } else if (currentState == SUB_HOPDWELL) {
+      editValue = constrain(editValue + 1, MIN_DWELL_US, MAX_DWELL_US);
+      needRedraw = true;
+    } else if (currentState == SUB_HOPRANGE) {
+      // editMin dulu, jika sudah di max maka editMax
+      // Kita gunakan subOption untuk tahu mana yang diedit: 0=min, 1=max
+      if (subOption == 0) {
+        editMin = constrain(editMin + 1, MIN_CHANNEL, editMax);
+      } else {
+        editMax = constrain(editMax + 1, editMin, MAX_CHANNEL);
+      }
+      needRedraw = true;
+    } else if (currentState == SUB_POWER || currentState == SUB_RATE || currentState == SUB_BAND) {
+      subOption = (subOption + 1) % (currentState == SUB_POWER ? 4 : (currentState == SUB_RATE ? 3 : 4));
+      needRedraw = true;
+    } else if (currentState == SUB_AGGRESSIVE || currentState == SUB_TURBO || currentState == SUB_STORM || 
+               currentState == SUB_RANDHOP || currentState == SUB_BLAST) {
+      // Toggle value, akan di-set saat RIGHT ditekan
+      // kita hanya ubah nilai sementara? Lebih mudah langsung toggle saat RIGHT
+      // Untuk sekarang, UP/DOWN tidak berpengaruh untuk toggle, biarkan saja.
+    }
+  }
+  else if (buttonPressed(BTN_DOWN)) {
+    if (currentState == MAIN_MENU) {
+      menuIndex = (menuIndex + 1) % mainMenuCount;
+      needRedraw = true;
+    } else if (currentState == SUB_CHANNEL) {
+      editValue = constrain(editValue - 1, MIN_CHANNEL, MAX_CHANNEL);
+      needRedraw = true;
+    } else if (currentState == SUB_HOPDWELL) {
+      editValue = constrain(editValue - 1, MIN_DWELL_US, MAX_DWELL_US);
+      needRedraw = true;
+    } else if (currentState == SUB_HOPRANGE) {
+      if (subOption == 0) {
+        editMin = constrain(editMin - 1, MIN_CHANNEL, editMax);
+      } else {
+        editMax = constrain(editMax - 1, editMin, MAX_CHANNEL);
+      }
+      needRedraw = true;
+    } else if (currentState == SUB_POWER || currentState == SUB_RATE || currentState == SUB_BAND) {
+      subOption = (subOption - 1 + (currentState == SUB_POWER ? 4 : (currentState == SUB_RATE ? 3 : 4))) % (currentState == SUB_POWER ? 4 : (currentState == SUB_RATE ? 3 : 4));
+      needRedraw = true;
+    }
+  }
+  else if (buttonPressed(BTN_RIGHT)) {
+    if (currentState == MAIN_MENU) {
+      // Masuk ke submenu berdasarkan menuIndex
+      switch (menuIndex) {
+        case 0: // Start/Stop
+          if (jamming) stopJamming(); else startJamming();
+          needRedraw = true;
+          break;
+        case 1: currentState = SUB_CHANNEL; editValue = currentChannel; needRedraw = true; break;
+        case 2: currentState = SUB_POWER; subOption = (powerStr == "MAX" ? 0 : powerStr == "HIGH" ? 1 : powerStr == "LOW" ? 2 : 3); needRedraw = true; break;
+        case 3: currentState = SUB_RATE; subOption = (rateStr == "250KBPS" ? 0 : rateStr == "1MBPS" ? 1 : 2); needRedraw = true; break;
+        case 4: currentState = SUB_AGGRESSIVE; needRedraw = true; break;
+        case 5: currentState = SUB_TURBO; needRedraw = true; break;
+        case 6: currentState = SUB_STORM; needRedraw = true; break;
+        case 7: currentState = SUB_RANDHOP; needRedraw = true; break;
+        case 8: currentState = SUB_BLAST; needRedraw = true; break;
+        case 9: currentState = SUB_HOPDWELL; editValue = hopDwell; needRedraw = true; break;
+        case 10: currentState = SUB_HOPRANGE; editMin = hopMin; editMax = hopMax; subOption = 0; needRedraw = true; break;
+        case 11: currentState = SUB_BAND; 
+          if (targetBand == "ALL") subOption = 0;
+          else if (targetBand == "WIFI") subOption = 1;
+          else if (targetBand == "BT") subOption = 2;
+          else if (targetBand == "BLE-ADV") subOption = 3;
+          needRedraw = true; 
+          break;
+        case 12: currentState = SUB_STATUS; needRedraw = true; break;
+        default: break;
+      }
+    } else {
+      // Di submenu, RIGHT = konfirmasi/terapkan
+      switch (currentState) {
+        case SUB_CHANNEL:
+          if (editValue >= MIN_CHANNEL && editValue <= MAX_CHANNEL) {
+            currentChannel = editValue;
+            if (jamming) setChannel(currentChannel);
+            Serial.println("Channel set to " + String(currentChannel));
+          }
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        case SUB_POWER: {
+          const char* pw[] = {"MAX","HIGH","LOW","MIN"};
+          String p = String(pw[subOption]);
+          processSerialCommand("power " + p);
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_RATE: {
+          const char* rt[] = {"250KBPS","1MBPS","2MBPS"};
+          String r = String(rt[subOption]);
+          processSerialCommand("rate " + r);
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_AGGRESSIVE: {
+          bool val = (subOption == 1); // 1 = ON
+          processSerialCommand(val ? "aggressive on" : "aggressive off");
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_TURBO: {
+          bool val = (subOption == 1);
+          processSerialCommand(val ? "turbo on" : "turbo off");
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_STORM: {
+          bool val = (subOption == 1);
+          processSerialCommand(val ? "storm on" : "storm off");
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_RANDHOP: {
+          bool val = (subOption == 1);
+          processSerialCommand(val ? "randhop on" : "randhop off");
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_BLAST: {
+          bool val = (subOption == 1);
+          processSerialCommand(val ? "blast on" : "blast off");
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_HOPDWELL:
+          if (editValue >= MIN_DWELL_US && editValue <= MAX_DWELL_US) {
+            hopDwell = editValue;
+            Serial.println("HopDwell set to " + String(hopDwell) + " us");
+          }
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        case SUB_HOPRANGE:
+          if (editMin >= MIN_CHANNEL && editMax <= MAX_CHANNEL && editMin <= editMax) {
+            hopMin = editMin; hopMax = editMax;
+            Serial.println("HopRange set to " + String(hopMin) + "-" + String(hopMax));
+          }
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        case SUB_BAND: {
+          const char* bands[] = {"all","wifi","bt","bleadv"};
+          processSerialCommand(String("band ") + bands[subOption]);
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        }
+        case SUB_STATUS:
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+        default:
+          currentState = MAIN_MENU;
+          needRedraw = true;
+          break;
+      }
+    }
+  }
+  else if (buttonPressed(BTN_B)) {
+    if (currentState != MAIN_MENU) {
+      currentState = MAIN_MENU;
+      needRedraw = true;
+    }
+    // Jika di main menu, tombol B tidak melakukan apa-apa (atau bisa digunakan untuk stop?)
+    // Kita biarkan saja.
+  }
 }
 
 // ============================================
@@ -479,6 +1020,7 @@ void processSerialCommand(String cmd) {
     else {
         Serial.println("Unknown command. type 'help' for list of commands.");
     }
+    needRedraw = true;
 }
 
 // ============================================
