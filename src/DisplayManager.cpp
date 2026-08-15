@@ -65,7 +65,7 @@ void DisplayManager::renderMainMenu() {
     }
 
     // Footer
-    tft.setCursor(8, 102);
+    tft.setCursor(8, 110);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("UP/DN:Pilih | RT:Masuk");
 }
@@ -119,7 +119,7 @@ void DisplayManager::renderJammerScreen() {
     }
 
     // Footer Controls
-    tft.setCursor(4, 102);
+    tft.setCursor(4, 110);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("UP/DN:Tgt | RT:Jam | B:Back");
 }
@@ -177,7 +177,7 @@ void DisplayManager::drawSpectrumGrid() {
     tft.print("2.4G");
 
     // Footer
-    tft.setCursor(4, 98);
+    tft.setCursor(4, 110);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("UP:Band  RT:Rst  B:Menu");
 }
@@ -242,44 +242,64 @@ void DisplayManager::renderSpectrumAnalyzer() {
 // RENDER CHANNEL INSPECTOR (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderChannelInspector() {
-    tft.fillScreen(ST77XX_BLACK);
+    // ---------------------------------------------------------------
+    // Bagian STATIS: digambar hanya sekali (saat masuk mode / ganti kanal)
+    // ---------------------------------------------------------------
+    if (needRedraw) {
+        tft.fillScreen(ST77XX_BLACK);
 
-    // Header Banner
-    tft.fillRect(0, 0, 160, 14, 0x0810);
-    tft.setCursor(24, 3);
-    tft.setTextColor(ST77XX_CYAN, 0x0810);
-    tft.setTextSize(1);
-    tft.println("CHANNEL INSPECTOR");
+        // Header Banner
+        tft.fillRect(0, 0, 160, 14, 0x0810);
+        tft.setCursor(24, 3);
+        tft.setTextColor(ST77XX_CYAN, 0x0810);
+        tft.setTextSize(1);
+        tft.println("CHANNEL INSPECTOR");
 
-    int ch = appState.inspectedChannel;
-    int freq = 2400 + ch;
+        int ch = appState.inspectedChannel;
+        int freq = 2400 + ch;
 
-    // Kanal & Frekuensi
-    tft.setCursor(8, 18);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Kanal RF : ");
-    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    tft.print(ch);
-    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    tft.print(" (");
-    tft.print(freq);
-    tft.print(" MHz)");
+        // Kanal & Frekuensi
+        tft.setCursor(8, 18);
+        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        tft.print("Kanal RF : ");
+        tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+        tft.print(ch);
+        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+        tft.print(" (");
+        tft.print(freq);
+        tft.print(" MHz)");
 
-    // Mapping Informasi Protokol
-    tft.setCursor(8, 30);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Protokol : ");
-    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-    if (ch >= 1 && ch <= 73) {
-        tft.print("Wi-Fi Band");
-    } else if (ch >= 74 && ch <= 80) {
-        tft.print("BT High Band");
-    } else {
-        tft.print("RF Extended");
+        // Mapping Informasi Protokol
+        tft.setCursor(8, 30);
+        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        tft.print("Protokol : ");
+        tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+        if (ch >= 1 && ch <= 73) {
+            tft.print("Wi-Fi Band");
+        } else if (ch >= 74 && ch <= 80) {
+            tft.print("BT High Band");
+        } else {
+            tft.print("RF Extended");
+        }
+
+        // Activity Gauge (Progress Bar - Width 144px)
+        tft.drawRect(8, 44, 144, 16, ST77XX_WHITE);
+
+        // Footer
+        tft.setCursor(4, 110);
+        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        tft.print("UP/DN:+1 | RT:+10 | B:Menu");
+
+        needRedraw = false;
     }
 
-    // Activity Gauge (Progress Bar - Width 144px)
+    // ---------------------------------------------------------------
+    // Bagian DINAMIS: update per-frame tanpa clear layar penuh (anti berkedip)
+    // ---------------------------------------------------------------
+    // Bersihkan area gauge (termasuk border), lalu gambar ulang border + isi
+    tft.fillRect(8, 44, 144, 16, ST77XX_BLACK);
     tft.drawRect(8, 44, 144, 16, ST77XX_WHITE);
+
     int barW = map(appState.inspectedLevel, 0, 100, 0, 140);
     if (barW > 0) {
         tft.fillRect(10, 46, barW, 12, getSignalColor(appState.inspectedLevel));
@@ -294,7 +314,8 @@ void DisplayManager::renderChannelInspector() {
         tft.drawFastVLine(peakX, 44, 16, ST77XX_CYAN);
     }
 
-    // Activity Percentage Text
+    // Activity Percentage Text (hapus baris lama lalu tulis ulang)
+    tft.fillRect(8, 64, 150, 8, ST77XX_BLACK);
     tft.setCursor(8, 64);
     tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     tft.print("Sinyal: ");
@@ -308,7 +329,8 @@ void DisplayManager::renderChannelInspector() {
     tft.print(appState.inspectedPeak);
     tft.print("%");
 
-    // Status Carrier
+    // Status Carrier (hapus baris lama lalu tulis ulang)
+    tft.fillRect(8, 76, 150, 8, ST77XX_BLACK);
     tft.setCursor(8, 76);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("Status: ");
@@ -319,11 +341,6 @@ void DisplayManager::renderChannelInspector() {
         tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
         tft.print("[ SINYAL BERSIH ]");
     }
-
-    // Footer
-    tft.setCursor(4, 102);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("UP/DN:+1 | RT:+10 | B:Menu");
 }
 
 // =============================================================================
@@ -374,7 +391,7 @@ void DisplayManager::renderStatusScreen() {
     tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
     tft.println("MAX (0 dBm)");
 
-    tft.setCursor(14, 102);
+    tft.setCursor(14, 110);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("Tekan B untuk kembali");
 }
@@ -400,10 +417,7 @@ void DisplayManager::updateUI() {
             renderSpectrumAnalyzer();
             break;
         case APP_MODE_ANALYZER_CHANNEL:
-            if (needRedraw) {
-                renderChannelInspector();
-                needRedraw = false;
-            }
+            renderChannelInspector();   // dynamic update tiap frame (statis di-redraw internal)
             break;
         case APP_MODE_STATUS:
             if (needRedraw) {

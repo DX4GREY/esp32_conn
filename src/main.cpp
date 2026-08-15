@@ -71,8 +71,9 @@ void loop() {
         radioManager.scanSpectrum(yieldToUI);
     } else if (appState.appMode == APP_MODE_ANALYZER_CHANNEL) {
         // Mode Channel Inspector: Monitor sinyal mendalam pada 1 kanal
+        // (tanpa requestRedraw tiap loop => hanya area dinamis yang di-update,
+        //  menghilangkan kedipan akibat fillScreen berulang)
         radioManager.inspectChannel(appState.inspectedChannel);
-        displayManager.requestRedraw();
         delay(25);
     } else {
         // Mode Jammer berjalan di Core 0 background task, Core 1 idle
