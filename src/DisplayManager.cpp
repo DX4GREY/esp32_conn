@@ -17,6 +17,11 @@ static const int NUM_MENU_ITEMS = 5;
 DisplayManager::DisplayManager()
     : tft(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST) {}
 
+static int16_t centeredTextX(const String& text, uint8_t textSize = 1, int16_t screenWidth = 160) {
+    int16_t textWidth = text.length() * 6 * textSize;
+    return (screenWidth - textWidth) / 2;
+}
+
 void DisplayManager::init() {
     tft.initR(INITR_BLACKTAB);   // ST7735 128x160
     tft.setRotation(3);          // Landscape 160 x 128
@@ -36,26 +41,39 @@ void DisplayManager::requestRedraw() {
 void DisplayManager::showSplash() {
     tft.fillScreen(ST77XX_BLACK);
 
-    // Decorative border frame
-    tft.drawRect(4, 4, 152, 120, ST77XX_DARKGRAY);
+    // Title "RF24 SUITE" (textSize 1, centered)
+    String title = "RF24 SUITE";
+    int16_t titleX = centeredTextX(title, 1);
+    tft.setCursor(titleX, 20);
+    tft.print(title);
 
-    // Title "NRF24 SUITE" (textSize 2, centered)
-    String titleText = "NRF24 SUITE";
-    tft.setTextSize(2);
-    int16_t titleWidth = titleText.length() * 12;  // 6px per char * 2 (textSize)
-    int16_t titleX = (160 - titleWidth) / 2;
-    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-    tft.setCursor(titleX, 50);
-    tft.print(titleText);
+    // Draw logo from byte array (centered)
+    int logoWidth = 64;
+    int logoHeight = 64;
+    int logoX = (160 - logoWidth) / 2;
+    int logoY = (128 - logoHeight) / 2;
+    // splashLogo is an RGB888 bitmap stored as 32-bit unsigned long in PROGMEM
+    // (64x64 pixels, one pixel per unsigned long with format 0x00RRGGBB).
+    // Adafruit_GFX::drawBitmap() expects 1-bit uint8_t data, and drawRGBBitmap()
+    // expects 16-bit RGB565 — neither matches the actual data type. We draw
+    // pixel-by-pixel, reading from PROGMEM and converting RGB888 -> RGB565.
+    tft.startWrite();
+    for (int16_t j = 0; j < logoHeight; j++) {
+        for (int16_t i = 0; i < logoWidth; i++) {
+            uint32_t pixel = pgm_read_dword(&splashLogo[j * logoWidth + i]);
+            uint8_t r = (pixel >> 16) & 0xFF;
+            uint8_t g = (pixel >> 8) & 0xFF;
+            uint8_t b = pixel & 0xFF;
+            tft.writePixel(logoX + i, logoY + j, tft.color565(r, g, b));
+        }
+    }
+    tft.endWrite();
 
-    // Subtitle "by Dx4Grey" (textSize 1, centered below the title)
-    String subtitleText = "by Dx4Grey";
-    tft.setTextSize(1);
-    int16_t subtitleWidth = subtitleText.length() * 6;  // 6px per char * 1 (textSize)
-    int16_t subtitleX = (160 - subtitleWidth) / 2;
-    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-    tft.setCursor(subtitleX, 72);
-    tft.print(subtitleText);
+    // Subtitle "by Dx4Grey" (textSize 1, centered below the splashLogo)
+    String subtitle = "by Dx4Grey";
+    int16_t subtitleX = centeredTextX(subtitle, 1);
+    tft.setCursor(subtitleX, logoY + logoHeight + 4);
+    tft.print(subtitle);
 
     // Keep the splash visible for a moment before the menu appears
     delay(2500);
@@ -472,12 +490,19 @@ void DisplayManager::renderRebootScreen() {
         tft.setCursor(24, 3);
         tft.setTextColor(ST77XX_WHITE, 0x7800);
         tft.setTextSize(1);
-        tft.println("SYSTEM REBOOT");
+        String headerText = "SYSTEM REBOOT";
+        int16_t headerWidth = headerText.length() * 6;
+        int16_t headerX = (160 - headerWidth) / 2;
+        tft.setCursor(headerX, 3);
+        tft.println(headerText);
 
         // Main Message
-        tft.setCursor(18, 44);
+        String mainMessage = "REBOOTING";
+        int16_t mainWidth = mainMessage.length() * 6;
+        int16_t mainX = (160 - mainWidth) / 2;
+        tft.setCursor(mainX, 44);
         tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-        tft.print("REBOOTING");
+        tft.print(mainMessage);
 
         tft.setCursor(38, 62);
         tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
@@ -489,16 +514,17 @@ void DisplayManager::renderRebootScreen() {
 
         needRedraw = false;
     }
-
-    // Running dot animation (REBOOTING. / REBOOTING.. / REBOOTING...)
+    String dotProgReboot = "REBOOTING";
     int dots = (millis() / 250) % 4;
-    tft.fillRect(18, 44, 90, 8, ST77XX_BLACK);
-    tft.setCursor(18, 44);
-    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    tft.print("REBOOTING");
     for (int d = 0; d < dots; d++) {
-        tft.print(".");
+        dotProgReboot += ".";
     }
+    int16_t dotProgRebootWidth = dotProgReboot.length() * 6;
+    int16_t dotX = (160 - dotProgRebootWidth) / 2;
+    tft.fillRect(0, 44, 160, 8, ST77XX_BLACK);
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    tft.setCursor(dotX, 44);
+    tft.print(dotProgReboot);
 }
 
 // =============================================================================

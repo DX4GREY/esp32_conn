@@ -13,13 +13,13 @@ bool RadioManager::init() {
 
     // Initialize nRF24L01+
     if (!radio.begin(&SPI)) {
-        Serial.println("❌ FATAL: nRF24L01+ not detected!");
+        Serial.println("FATAL: nRF24L01+ not detected!");
         Serial.println("   Check wiring and SPI pinout. System HANG.");
         return false;
     }
 
     applyTxConfig();
-    Serial.println("✅ nRF24L01+ Radio Ready!");
+    Serial.println("nRF24L01+ Radio Ready!");
     Serial.println("   Use the display menu or type 'help' in Serial.\n");
     return true;
 }
@@ -82,7 +82,7 @@ void RadioManager::startJammer(JammerTarget target) {
         0
     );
 
-    Serial.println("🔥 JAMMER ACTIVE (Core 0 Background Task): " + String(appState.getJammerTargetName()));
+    Serial.println("JAMMER ACTIVE (Core 0 Background Task): " + String(appState.getJammerTargetName()));
     Serial.println("   Range: " + String(appState.getJammerFreqRangeStr()) + "\n");
 }
 
@@ -101,7 +101,7 @@ void RadioManager::stopJammer() {
     radio.stopConstCarrier();
     radio.powerDown();
     appState.jamming = false;
-    Serial.println("🛑 Jammer Stopped.");
+    Serial.println("Jammer Stopped.");
 }
 
 void RadioManager::stopAll() {
