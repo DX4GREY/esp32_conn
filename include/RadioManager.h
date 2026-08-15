@@ -10,11 +10,11 @@ public:
     RadioManager();
     bool init();
 
-    // Jammer Kontrol (Dual-Core FreeRTOS)
+    // Jammer Control (Dual-Core FreeRTOS)
     void startJammer(JammerTarget target);
     void stopJammer();
 
-    // Analyzer Kontrol
+    // Analyzer Control
     void enterRxMode();
     void enterTxMode();
     void scanSpectrum(void (*yieldCb)() = nullptr);

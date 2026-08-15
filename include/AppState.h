@@ -8,26 +8,27 @@
 // =============================================================================
 
 enum AppMode {
-    APP_MODE_MENU,               // Menu Utama
-    APP_MODE_JAMMER,             // Mode Jammer Cepat Multi-Target
-    APP_MODE_ANALYZER_SPECTRUM,  // Mode Radio Analyzer: Live RF Spectrum Graph
-    APP_MODE_ANALYZER_CHANNEL,   // Mode Radio Analyzer: Detail Inspeksi 1 Channel
-    APP_MODE_STATUS              // Informasi Status Perangkat & Hardware
+    APP_MODE_MENU,               // Main Menu
+    APP_MODE_JAMMER,             // Fast Multi-Target Jammer Mode
+    APP_MODE_ANALYZER_SPECTRUM,  // Radio Analyzer Mode: Live RF Spectrum Graph
+    APP_MODE_ANALYZER_CHANNEL,   // Radio Analyzer Mode: Deep Inspection of 1 Channel
+    APP_MODE_STATUS,             // Device Status Information
+    APP_MODE_REBOOT              // System Reboot / Restart
 };
 
 enum JammerTarget {
-    JAM_TARGET_WIFI = 0,         // Target Wi-Fi 2.4 GHz (14 Channels 22MHz Sweep)
-    JAM_TARGET_BT = 1,           // Target Bluetooth Classic (0 - 79 MHz Sweep)
-    JAM_TARGET_BLE_ADV = 2,      // Target BLE Advertising Only (Ch 2, 26, 80)
-    JAM_TARGET_BLE_DATA = 3,     // Target BLE Data Only (Even Ch 2 - 80)
-    JAM_TARGET_ALL = 4,          // Target Seluruh Band 2.4 GHz / Drone (Ch 0 - 125)
-    JAM_TARGET_ZIGBEE = 5        // Target Zigbee (Ch 11 - 26)
+    JAM_TARGET_WIFI = 0,         // Wi-Fi 2.4 GHz Target (14 Channels 22MHz Sweep)
+    JAM_TARGET_BT = 1,           // Bluetooth Classic Target (0 - 79 MHz Sweep)
+    JAM_TARGET_BLE_ADV = 2,      // BLE Advertising Only Target (Ch 2, 26, 80)
+    JAM_TARGET_BLE_DATA = 3,     // BLE Data Only Target (Even Ch 2 - 80)
+    JAM_TARGET_ALL = 4,          // Entire 2.4 GHz Band / Drone Target (Ch 0 - 125)
+    JAM_TARGET_ZIGBEE = 5        // Zigbee Target (Ch 11 - 26)
 };
 
 enum AnalyzerBand {
-    SCAN_BAND_ALL = 0,           // Scan seluruh 126 kanal (0 - 125)
-    SCAN_BAND_WIFI = 1,          // Scan kanal rentang Wi-Fi (1 - 73)
-    SCAN_BAND_BT = 2             // Scan kanal rentang Bluetooth (2 - 80)
+    SCAN_BAND_ALL = 0,           // Scan all 126 channels (0 - 125)
+    SCAN_BAND_WIFI = 1,          // Scan Wi-Fi channel range (1 - 73)
+    SCAN_BAND_BT = 2             // Scan Bluetooth channel range (2 - 80)
 };
 
 // =============================================================================
@@ -45,18 +46,18 @@ struct AppState {
     int jammerMaxCh = WIFI_MAX_CH;
     int currentJamChannel = 37;
 
-    // Parameter Radio Transmisi (Auto Aggressive)
+    // Radio Transmission Parameters (Auto Aggressive)
     rf24_pa_dbm_e powerLevel = DEFAULT_POWER;
     rf24_datarate_e dataRate = DEFAULT_RATE;
 
     // ----- ANALYZER STATE -----
     AnalyzerBand analyzerBand = SCAN_BAND_ALL;
-    uint8_t spectrumLevels[TOTAL_CHANNELS];  // Aktivitas RF saat ini (0 - 100%)
-    uint8_t peakLevels[TOTAL_CHANNELS];      // Nilai Peak Hold (0 - 100%)
-    int peakChannel = 0;                     // Kanal dengan RF tertinggi
-    uint8_t peakLevel = 0;                   // Nilai RF tertinggi saat ini (%)
+    uint8_t spectrumLevels[TOTAL_CHANNELS];  // Current RF activity (0 - 100%)
+    uint8_t peakLevels[TOTAL_CHANNELS];      // Peak Hold Value (0 - 100%)
+    int peakChannel = 0;                     // Channel with the highest RF
+    uint8_t peakLevel = 0;                   // Current highest RF value (%)
 
-    // Inspeksi Kanal Tunggal
+    // Single Channel Inspection
     int inspectedChannel = 36;               // Default Wi-Fi Ch 6
     uint8_t inspectedLevel = 0;              // Aktivitas real-time %
     uint8_t inspectedPeak = 0;               // Peak aktivitas %

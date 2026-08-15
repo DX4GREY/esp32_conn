@@ -5,22 +5,22 @@ RadioManager radioManager;
 RadioManager::RadioManager() : radio(CE_PIN, CSN_PIN) {}
 
 bool RadioManager::init() {
-    // Inisialisasi SPI kustom pin (16 MHz)
+    // Initialize custom SPI pins (16 MHz)
     SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, CSN_PIN);
     SPI.setFrequency(16000000);
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
 
-    // Inisialisasi nRF24L01+
+    // Initialize nRF24L01+
     if (!radio.begin(&SPI)) {
-        Serial.println("❌ FATAL: nRF24L01+ tidak terdeteksi!");
-        Serial.println("   Periksa kabel dan pinout SPI. Sistem HANG.");
+        Serial.println("❌ FATAL: nRF24L01+ not detected!");
+        Serial.println("   Check wiring and SPI pinout. System HANG.");
         return false;
     }
 
     applyTxConfig();
-    Serial.println("✅ Radio nRF24L01+ Siap!");
-    Serial.println("   Gunakan Menu Layar atau ketik 'help' di Serial.\n");
+    Serial.println("✅ nRF24L01+ Radio Ready!");
+    Serial.println("   Use the display menu or type 'help' in Serial.\n");
     return true;
 }
 
@@ -57,7 +57,7 @@ void RadioManager::enterRxMode() {
 
 void RadioManager::startJammer(JammerTarget target) {
     if (appState.jamming && jammerTaskHandle != NULL) {
-        // Jika target berubah saat jamming, ubah langsung
+        // If the target changes while jamming, switch directly
         appState.setJammerTarget(target);
         return;
     }
@@ -71,7 +71,7 @@ void RadioManager::startJammer(JammerTarget target) {
 
     appState.jamming = true;
 
-    // Luncurkan task transmisi agresif berkecepatan tinggi di Core 0
+    // Launch the ultra-fast aggressive transmission task on Core 0
     xTaskCreatePinnedToCore(
         RadioManager::jammerTaskCode,
         "RFJammer",
@@ -82,8 +82,8 @@ void RadioManager::startJammer(JammerTarget target) {
         0
     );
 
-    Serial.println("🔥 JAMMER AKTIF (Core 0 Background Task): " + String(appState.getJammerTargetName()));
-    Serial.println("   Rentang: " + String(appState.getJammerFreqRangeStr()) + "\n");
+    Serial.println("🔥 JAMMER ACTIVE (Core 0 Background Task): " + String(appState.getJammerTargetName()));
+    Serial.println("   Range: " + String(appState.getJammerFreqRangeStr()) + "\n");
 }
 
 void RadioManager::stopJammer() {
@@ -101,7 +101,7 @@ void RadioManager::stopJammer() {
     radio.stopConstCarrier();
     radio.powerDown();
     appState.jamming = false;
-    Serial.println("🛑 Jammer Dimatikan.");
+    Serial.println("🛑 Jammer Stopped.");
 }
 
 void RadioManager::stopAll() {
@@ -150,7 +150,7 @@ void RadioManager::jammerTaskCode(void *param) {
                 break;
 
             // -----------------------------------------------------------------
-            // 3. TARGET BLE ADVERTISING (Kanal 2, 26, 80)
+            // 3. TARGET BLE ADVERTISING (Channels 2, 26, 80)
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_ADV:
                 for (int ch = 0; ch < 3 && !self->stopJam; ch++) {
@@ -160,7 +160,7 @@ void RadioManager::jammerTaskCode(void *param) {
                 break;
 
             // -----------------------------------------------------------------
-            // 4. TARGET BLE DATA (Kanal Genap 2 - 80)
+            // 4. TARGET BLE DATA (Even Channels 2 - 80)
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_DATA:
                 for (int ch = 2; ch <= 80 && !self->stopJam; ch += 2) {
@@ -170,7 +170,7 @@ void RadioManager::jammerTaskCode(void *param) {
                 break;
 
             // -----------------------------------------------------------------
-            // 5. TARGET ALL BAND / DRONE (Kanal 0 - 125)
+            // 5. TARGET ALL BAND / DRONE (Channels 0 - 125)
             // -----------------------------------------------------------------
             case JAM_TARGET_ALL:
                 for (int ch = 0; ch < 125 && !self->stopJam; ch++) {
@@ -180,7 +180,7 @@ void RadioManager::jammerTaskCode(void *param) {
                 break;
 
             // -----------------------------------------------------------------
-            // 6. TARGET ZIGBEE (Kanal 11 - 26)
+            // 6. TARGET ZIGBEE (Channels 11 - 26)
             // -----------------------------------------------------------------
             case JAM_TARGET_ZIGBEE:
                 for (int channel = 11; channel < 27 && !self->stopJam; channel++) {
@@ -195,7 +195,7 @@ void RadioManager::jammerTaskCode(void *param) {
                 }
                 break;
         }
-        vTaskDelay(1); // Memberi jeda 1 tick agar IDLE0 Core 0 dapat mereset Task Watchdog
+        vTaskDelay(1); // Give a 1-tick delay so Core 0 IDLE0 can reset the Task Watchdog
     }
     vTaskDelete(NULL);
 }
@@ -216,7 +216,7 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
 
     for (int ch = minCh; ch <= maxCh; ch++) {
         radio.setChannel(ch);
-        delayMicroseconds(35); // Waktu stabilisasi PLL Synthesizer
+        delayMicroseconds(35); // PLL Synthesizer stabilization time
 
         int hits = 0;
         for (int s = 0; s < SPECTRUM_SAMPLES_PER_CH; s++) {

@@ -2,14 +2,14 @@
  * =============================================================================
  * ESP32-S3 RF24 SUITE: DUAL-CORE JAMMER & SPECTRUM ANALYZER
  * =============================================================================
- * Modul Terorganisir:
- *  - Config.h             : Pinout hardware, timing, preset frekuensi, & konstanta
- *  - AppState.h/.cpp      : State global, 6 target preset jammer, & data analyzer
- *  - ButtonManager.h/.cpp : Debouncing 50ms & edge detection tombol navigasi
- *  - Watchdog.h/.cpp      : Hardware watchdog timer ESP32-S3 (3 detik auto-recovery)
+ * Organized Modules:
+ *  - Config.h             : Hardware pinout, timing, frequency presets, & constants
+ *  - AppState.h/.cpp      : Global state, 6 jammer target presets, & analyzer data
+ *  - ButtonManager.h/.cpp : 50ms debouncing & navigation button edge detection
+ *  - Watchdog.h/.cpp      : ESP32-S3 hardware watchdog timer (3s auto-recovery)
  *  - RadioManager.h/.cpp  : Dual-Core FreeRTOS Task (Core 0 RF Jamming) & Spectrum Scanning
- *  - DisplayManager.h/.cpp: Menu visual, grafik spektrum real-time, & channel inspector
- *  - SerialCommander.h/.cpp: CLI monitor interaktif & visualisasi grafik ASCII
+ *  - DisplayManager.h/.cpp: Visual menu, real-time spectrum graph, & channel inspector
+ *  - SerialCommander.h/.cpp: Interactive CLI monitor & ASCII graph visualization
  * =============================================================================
  */
 
@@ -22,7 +22,7 @@
 #include "DisplayManager.h"
 #include "SerialCommander.h"
 
-// Callback untuk menjaga tombol & sistem UI tetap responsif saat scanning
+// Callback to keep buttons & UI responsive during scanning
 void yieldToUI() {
     displayManager.processInput();
     watchdog.feed();
@@ -32,23 +32,23 @@ void yieldToUI() {
 // SETUP
 // =============================================================================
 void setup() {
-    // 1. Inisialisasi Serial CLI (115200 Baud)
+    // 1. Initialize Serial CLI (115200 Baud)
     serialCommander.init(115200);
 
-    // 2. Inisialisasi Tombol Navigasi (Pull-Up)
+    // 2. Initialize Navigation Buttons (Pull-Up)
     buttonManager.init();
 
-    // 3. Inisialisasi Layar TFT ST7735 1.8" (160x128 Compact)
+    // 3. Initialize TFT ST7735 1.8" Display (160x128 Compact)
     displayManager.init();
 
-    // 4. Inisialisasi Radio nRF24L01+
+    // 4. Initialize nRF24L01+ Radio
     if (!radioManager.init()) {
         while (1) {
             delay(1000);
         }
     }
 
-    // 5. Inisialisasi Hardware Watchdog (3.0s Timeout)
+    // 5. Initialize Hardware Watchdog (3.0s Timeout)
     watchdog.init(WATCHDOG_TIMEOUT_US);
 }
 
@@ -59,31 +59,41 @@ void loop() {
     // 1. Reset Watchdog Timer (Heartbeat)
     watchdog.feed();
 
-    // 2. Proses Perintah Serial Monitor jika ada
+    // 2. Process Serial Monitor commands if any
     serialCommander.process();
 
-    // 3. Proses Input Tombol Fisik
+    // 3. Process Physical Button Input
     displayManager.processInput();
 
-    // 4. Eksekusi Berdasarkan Mode Aktif
+    // 4. Execute Based on Active Mode
     if (appState.appMode == APP_MODE_ANALYZER_SPECTRUM) {
-        // Mode Radio Analyzer: Pindai 126 kanal 2.4 GHz dan update level spektrum
+        // Radio Analyzer Mode: Scan 126 channels and update spectrum levels
         radioManager.scanSpectrum(yieldToUI);
     } else if (appState.appMode == APP_MODE_ANALYZER_CHANNEL) {
-        // Mode Channel Inspector: Monitor sinyal mendalam pada 1 kanal
-        // (tanpa requestRedraw tiap loop => hanya area dinamis yang di-update,
-        //  menghilangkan kedipan akibat fillScreen berulang)
+        // Channel Inspector Mode: Deep RF monitoring on a single channel
+        // (no per-loop requestRedraw => only dynamic areas are updated,
+        //  eliminating flicker from repeated fillScreen)
         radioManager.inspectChannel(appState.inspectedChannel);
         delay(25);
+    } else if (appState.appMode == APP_MODE_REBOOT) {
+        // Reboot Mode: screen is rendered in updateUI, restart is briefly delayed
+        delay(10);
     } else {
-        // Mode Jammer berjalan di Core 0 background task, Core 1 idle
+        // Jammer Mode runs on Core 0 background task, Core 1 idle
         delay(10);
     }
 
-    // 5. Render Tampilan Layar TFT jika ada pembaruan
+    // 5. Render TFT screen if there are updates
     displayManager.updateUI();
 
-    // 6. Auto-recovery jika terjadi Watchdog Timeout
+    // 5b. Reboot System: show message then restart ESP32
+    if (appState.appMode == APP_MODE_REBOOT) {
+        delay(1200); // give the reboot message time to be visible on screen
+        Serial.println("REBOOTING SYSTEM...");
+        ESP.restart();
+    }
+
+    // 6. Auto-recovery on Watchdog Timeout
     if (watchdog.isTriggered()) {
         Serial.println("WATCHDOG TRIGGERED! Restarting ESP32...");
         ESP.restart();

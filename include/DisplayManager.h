@@ -20,14 +20,15 @@ private:
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
 
-    // Layar Render
+    // Screen Renderers
     void renderMainMenu();
     void renderJammerScreen();
     void renderSpectrumAnalyzer();
     void renderChannelInspector();
     void renderStatusScreen();
+    void renderRebootScreen();
 
-    // Helper Grafis
+    // Graphics Helpers
     uint16_t getSignalColor(uint8_t level);
     void drawSpectrumGrid();
     void drawSpectrumBars();

@@ -25,16 +25,16 @@ int ButtonManager::readButton(int pin) {
     unsigned long now = millis();
 
     if (raw != stableState[idx]) {
-        // Ada perubahan — mulai atau lanjutkan timer debounce
+        // Change detected — start or continue the debounce timer
         if (lastChangeTime[idx] == 0) {
-            lastChangeTime[idx] = now;  // Catat awal transisi
+            lastChangeTime[idx] = now;  // Record the transition start
         }
         if (now - lastChangeTime[idx] >= BUTTON_DEBOUNCE_MS) {
-            stableState[idx] = raw;     // Terima state baru setelah stabil
-            lastChangeTime[idx] = 0;    // Reset untuk transisi berikutnya
+            stableState[idx] = raw;     // Accept the new state after it is stable
+            lastChangeTime[idx] = 0;    // Reset for the next transition
         }
     } else {
-        lastChangeTime[idx] = 0;        // Kembali ke state stabil — reset timer
+        lastChangeTime[idx] = 0;        // Back to a stable state — reset the timer
     }
     return stableState[idx];
 }

@@ -6,11 +6,13 @@
 DisplayManager displayManager;
 
 static const char* menuTitles[] = {
-    "1. Jammer (Wi-Fi/BT/All)",
+    "1. Jammer Frequency",
     "2. Spectrum Analyzer",
     "3. Channel Inspector",
-    "4. Device Status"
+    "4. Device Status",
+    "5. Reboot System"
 };
+static const int NUM_MENU_ITEMS = 5;
 
 DisplayManager::DisplayManager()
     : tft(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST) {}
@@ -36,7 +38,7 @@ uint16_t DisplayManager::getSignalColor(uint8_t level) {
 }
 
 // =============================================================================
-// RENDER MENU UTAMA (COMPACT & FIT)
+// RENDER MAIN MENU (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderMainMenu() {
     tft.fillScreen(ST77XX_BLACK);
@@ -48,8 +50,8 @@ void DisplayManager::renderMainMenu() {
     tft.setTextSize(1);
     tft.println("=== RF24 SUITE ===");
 
-    // List Menu (Spacing 18px)
-    for (int i = 0; i < 4; i++) {
+    // Menu List (Spacing 18px)
+    for (int i = 0; i < NUM_MENU_ITEMS; i++) {
         int y = 20 + (i * 18);
         if (i == menuSelection) {
             tft.fillRect(6, y - 2, 148, 15, 0x2124); // Highlight box
@@ -67,7 +69,7 @@ void DisplayManager::renderMainMenu() {
     // Footer
     tft.setCursor(8, 110);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("UP/DN:Pilih | RT:Masuk");
+    tft.print("UP/DN:Select | RT:Enter");
 }
 
 // =============================================================================
@@ -95,14 +97,14 @@ void DisplayManager::renderJammerScreen() {
     tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
     tft.println(appState.getJammerFreqRangeStr());
 
-    // Status Box (Aktif / Standby)
+    // Status Box (Active / Standby)
     int statusY = 58;
     if (appState.jamming) {
         tft.fillRect(6, statusY, 148, 34, ST77XX_RED);
         tft.drawRect(6, statusY, 148, 34, ST77XX_YELLOW);
         tft.setCursor(18, statusY + 5);
         tft.setTextColor(ST77XX_WHITE, ST77XX_RED);
-        tft.print("[ SERANGAN AKTIF! ]");
+        tft.print("[ JAMMING ACTIVE! ]");
         
         tft.setCursor(14, statusY + 19);
         tft.print("Ch: ");
@@ -146,12 +148,12 @@ void DisplayManager::drawSpectrumGrid() {
     tft.print(appState.peakLevel);
     tft.print("%)");
 
-    // Grid Garis Level Y (100%, 50%, Baseline 0%)
+    // Y-axis Grid Level Lines (100%, 50%, Baseline 0%)
     tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_TOP, GRAPH_WIDTH, ST77XX_DARKGRAY);
     tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2), GRAPH_WIDTH, ST77XX_DARKGRAY);
-    tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_BASELINE, GRAPH_WIDTH, ST77XX_WHITE); // Garis dasar X
+    tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_BASELINE, GRAPH_WIDTH, ST77XX_WHITE); // X baseline
 
-    // Label Sumbu Y (0, 50, 100)
+    // Y-axis Labels (0, 50, 100)
     tft.setCursor(0, GRAPH_Y_TOP);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("100");
@@ -160,7 +162,7 @@ void DisplayManager::drawSpectrumGrid() {
     tft.setCursor(6, GRAPH_Y_BASELINE - 4);
     tft.print(" 0");
 
-    // Sumbu X: Penanda Kanal Wi-Fi Populer (1, 6, 11, 14)
+    // X-axis: Popular Wi-Fi Channel Markers (1, 6, 11, 14)
     const int wifiMarkers[4] = {12, 37, 62, 84};
     const char* wifiLabels[4] = {"1", "6", "11", "14"};
 
@@ -195,7 +197,7 @@ void DisplayManager::drawSpectrumBars() {
     tft.print(appState.peakLevel);
     tft.print("%");
 
-    // Render bar spectrum tiap kanal
+    // Render spectrum bar for each channel
     for (int ch = 0; ch < TOTAL_CHANNELS; ch++) {
         int x = GRAPH_X_START + ch;
         uint8_t lvl = appState.spectrumLevels[ch];
@@ -207,22 +209,22 @@ void DisplayManager::drawSpectrumBars() {
         int barTop = GRAPH_Y_BASELINE - barHeight;
         int peakTop = GRAPH_Y_BASELINE - peakHeight;
 
-        // 1. Bersihkan area kosong di atas bar dan peak
+        // 1. Clear empty area above the bar and peak
         if (peakTop > GRAPH_Y_TOP) {
             tft.drawFastVLine(x, GRAPH_Y_TOP, peakTop - GRAPH_Y_TOP, ST77XX_BLACK);
         }
 
-        // 2. Gambar Peak Hold Indicator
+        // 2. Draw Peak Hold Indicator
         if (peakHeight > 0 && peakTop >= GRAPH_Y_TOP) {
             tft.drawPixel(x, peakTop, ST77XX_CYAN);
         }
 
-        // 3. Bersihkan ruang antara peak dan bar aktif
+        // 3. Clear space between peak and active bar
         if (peakTop < barTop - 1) {
             tft.drawFastVLine(x, peakTop + 1, barTop - peakTop - 1, ST77XX_BLACK);
         }
 
-        // 4. Gambar Batang Sinyal Aktif
+        // 4. Draw Active Signal Bar
         if (barHeight > 0) {
             uint16_t color = getSignalColor(lvl);
             tft.drawFastVLine(x, barTop, barHeight, color);
@@ -243,7 +245,7 @@ void DisplayManager::renderSpectrumAnalyzer() {
 // =============================================================================
 void DisplayManager::renderChannelInspector() {
     // ---------------------------------------------------------------
-    // Bagian STATIS: digambar hanya sekali (saat masuk mode / ganti kanal)
+    // STATIC part: drawn only once (when entering the mode / changing channel)
     // ---------------------------------------------------------------
     if (needRedraw) {
         tft.fillScreen(ST77XX_BLACK);
@@ -258,10 +260,10 @@ void DisplayManager::renderChannelInspector() {
         int ch = appState.inspectedChannel;
         int freq = 2400 + ch;
 
-        // Kanal & Frekuensi
+        // Channel & Frequency
         tft.setCursor(8, 18);
         tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("Kanal RF : ");
+        tft.print("RF Ch: ");
         tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
         tft.print(ch);
         tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
@@ -269,10 +271,10 @@ void DisplayManager::renderChannelInspector() {
         tft.print(freq);
         tft.print(" MHz)");
 
-        // Mapping Informasi Protokol
+        // Protocol Information Mapping
         tft.setCursor(8, 30);
         tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("Protokol : ");
+        tft.print("Protocol : ");
         tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
         if (ch >= 1 && ch <= 73) {
             tft.print("Wi-Fi Band");
@@ -294,9 +296,9 @@ void DisplayManager::renderChannelInspector() {
     }
 
     // ---------------------------------------------------------------
-    // Bagian DINAMIS: update per-frame tanpa clear layar penuh (anti berkedip)
+    // DYNAMIC part: per-frame update without a full-screen clear (anti-flicker)
     // ---------------------------------------------------------------
-    // Bersihkan area gauge (termasuk border), lalu gambar ulang border + isi
+    // Clear the gauge area (incl. border), then redraw border + fill
     tft.fillRect(8, 44, 144, 16, ST77XX_BLACK);
     tft.drawRect(8, 44, 144, 16, ST77XX_WHITE);
 
@@ -314,11 +316,11 @@ void DisplayManager::renderChannelInspector() {
         tft.drawFastVLine(peakX, 44, 16, ST77XX_CYAN);
     }
 
-    // Activity Percentage Text (hapus baris lama lalu tulis ulang)
+    // Activity Percentage Text (clear old row, then redraw)
     tft.fillRect(8, 64, 150, 8, ST77XX_BLACK);
     tft.setCursor(8, 64);
     tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    tft.print("Sinyal: ");
+    tft.print("Signal: ");
     tft.setTextColor(getSignalColor(appState.inspectedLevel), ST77XX_BLACK);
     tft.print(appState.inspectedLevel);
     tft.print("%  ");
@@ -329,17 +331,17 @@ void DisplayManager::renderChannelInspector() {
     tft.print(appState.inspectedPeak);
     tft.print("%");
 
-    // Status Carrier (hapus baris lama lalu tulis ulang)
+    // Carrier Status (clear old row, then redraw)
     tft.fillRect(8, 76, 150, 8, ST77XX_BLACK);
     tft.setCursor(8, 76);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("Status: ");
     if (appState.inspectedLevel > 20) {
         tft.setTextColor(ST77XX_RED, ST77XX_BLACK);
-        tft.print("[ TERDETEKSI RF ]");
+        tft.print("[ RF DETECTED ]");
     } else {
         tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
-        tft.print("[ SINYAL BERSIH ]");
+        tft.print("[ SIGNAL CLEAR ]");
     }
 }
 
@@ -393,7 +395,48 @@ void DisplayManager::renderStatusScreen() {
 
     tft.setCursor(14, 110);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Tekan B untuk kembali");
+    tft.print("Press B to go back");
+}
+
+// =============================================================================
+// RENDER REBOOT SCREEN (SYSTEM RESTART)
+// =============================================================================
+void DisplayManager::renderRebootScreen() {
+    if (needRedraw) {
+        tft.fillScreen(ST77XX_BLACK);
+
+        // Header Banner
+        tft.fillRect(0, 0, 160, 14, 0x7800); // Maroon (dark red)
+        tft.setCursor(24, 3);
+        tft.setTextColor(ST77XX_WHITE, 0x7800);
+        tft.setTextSize(1);
+        tft.println("SYSTEM REBOOT");
+
+        // Main Message
+        tft.setCursor(18, 44);
+        tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+        tft.print("REBOOTING");
+
+        tft.setCursor(38, 62);
+        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        tft.print("PLEASE WAIT");
+
+        tft.setCursor(8, 100);
+        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+        tft.print("Restarting ESP32...");
+
+        needRedraw = false;
+    }
+
+    // Running dot animation (REBOOTING. / REBOOTING.. / REBOOTING...)
+    int dots = (millis() / 250) % 4;
+    tft.fillRect(18, 44, 90, 8, ST77XX_BLACK);
+    tft.setCursor(18, 44);
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    tft.print("REBOOTING");
+    for (int d = 0; d < dots; d++) {
+        tft.print(".");
+    }
 }
 
 // =============================================================================
@@ -417,13 +460,16 @@ void DisplayManager::updateUI() {
             renderSpectrumAnalyzer();
             break;
         case APP_MODE_ANALYZER_CHANNEL:
-            renderChannelInspector();   // dynamic update tiap frame (statis di-redraw internal)
+            renderChannelInspector();   // per-frame dynamic update (static part redrawn internally)
             break;
         case APP_MODE_STATUS:
             if (needRedraw) {
                 renderStatusScreen();
                 needRedraw = false;
             }
+            break;
+        case APP_MODE_REBOOT:
+            renderRebootScreen();   // di-render tiap frame agar animasi titik hidup
             break;
     }
 }
@@ -433,14 +479,14 @@ void DisplayManager::updateUI() {
 // =============================================================================
 void DisplayManager::processInput() {
     // -------------------------------------------------------------------------
-    // KONDISI 1: MENU UTAMA
+    // CONDITION 1: MAIN MENU
     // -------------------------------------------------------------------------
     if (appState.appMode == APP_MODE_MENU) {
         if (buttonManager.isPressed(BTN_UP)) {
-            menuSelection = (menuSelection - 1 + 4) % 4;
+            menuSelection = (menuSelection - 1 + NUM_MENU_ITEMS) % NUM_MENU_ITEMS;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
-            menuSelection = (menuSelection + 1) % 4;
+            menuSelection = (menuSelection + 1) % NUM_MENU_ITEMS;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             if (menuSelection == 0) {
@@ -455,12 +501,16 @@ void DisplayManager::processInput() {
                 appState.appMode = APP_MODE_ANALYZER_CHANNEL;
             } else if (menuSelection == 3) {
                 appState.appMode = APP_MODE_STATUS;
+            } else if (menuSelection == 4) {
+                // Reboot System: stop radio then enter reboot mode
+                radioManager.stopAll();
+                appState.appMode = APP_MODE_REBOOT;
             }
             needRedraw = true;
         }
     }
     // -------------------------------------------------------------------------
-    // KONDISI 2: JAMMER MODE
+    // CONDITION 2: JAMMER MODE
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_JAMMER) {
         if (buttonManager.isPressed(BTN_UP)) {
@@ -489,7 +539,7 @@ void DisplayManager::processInput() {
         }
     }
     // -------------------------------------------------------------------------
-    // KONDISI 3: SPECTRUM ANALYZER
+    // CONDITION 3: SPECTRUM ANALYZER
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_ANALYZER_SPECTRUM) {
         if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
@@ -505,7 +555,7 @@ void DisplayManager::processInput() {
         }
     }
     // -------------------------------------------------------------------------
-    // KONDISI 4: CHANNEL INSPECTOR
+    // CONDITION 4: CHANNEL INSPECTOR
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_ANALYZER_CHANNEL) {
         if (buttonManager.isPressed(BTN_UP)) {
@@ -527,7 +577,7 @@ void DisplayManager::processInput() {
         }
     }
     // -------------------------------------------------------------------------
-    // KONDISI 5: STATUS
+    // CONDITION 5: STATUS
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_STATUS) {
         if (buttonManager.isPressed(BTN_B) || buttonManager.isPressed(BTN_RIGHT)) {
