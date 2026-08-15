@@ -78,12 +78,12 @@
 
 // ============ OBJEK TFT ============
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST);
-unsigned long lastDisplayUpdate = 0;
+// lastDisplayUpdate dihapus karena UI baru menggunakan system needRedraw + processUI/updateUI
 
 // ============ PIN TOMBOL ============
-#define BTN_UP    11
-#define BTN_RIGHT 10
-#define BTN_DOWN  9
+#define BTN_UP    10
+#define BTN_RIGHT 9
+#define BTN_DOWN  8
 #define BTN_B     5
 
 // ===== PRESET BAND TARGET  (frekuensi = 2400 + RF24 channel MHz) =====
@@ -236,10 +236,15 @@ void setup() {
     timerAlarmEnable(watchdogTimer);
 }
 
-// ============ FUNGSI TOMBOL ============
+// ============ FUNGSI TOMBOL (DEBOUNCE FIX) ============
+// Algoritma:
+// - lastChangeTime[4]: mencatat kapan transisi dimulai (0 = tidak ada transisi)
+// - stableState[4]:    state yang sudah stabil (ter-debounce)
+// - Saat raw != stableState → catat waktu transisi, tunggu 50ms
+// - Saat raw == stableState → reset timer transisi (tidak ada perubahan)
 int readButton(int pin) {
-  static unsigned long lastTime[4] = {0,0,0,0};
-  static int lastState[4] = {HIGH, HIGH, HIGH, HIGH};
+  static unsigned long lastChangeTime[4] = {0, 0, 0, 0};
+  static int stableState[4] = {HIGH, HIGH, HIGH, HIGH};
   int idx;
   if (pin == BTN_UP) idx = 0;
   else if (pin == BTN_RIGHT) idx = 1;
@@ -247,17 +252,23 @@ int readButton(int pin) {
   else if (pin == BTN_B) idx = 3;
   else return HIGH;
 
-  int state = digitalRead(pin);
-  if (state != lastState[idx]) {
-    lastTime[idx] = millis();
-  }
-  if ((millis() - lastTime[idx]) > BUTTON_DEBOUNCE) {
-    lastState[idx] = state;
-    return state;
-  }
-  return lastState[idx];
-}
+  int raw = digitalRead(pin);
+  unsigned long now = millis();
 
+  if (raw != stableState[idx]) {
+    // Ada perubahan — mulai atau lanjutkan timer debounce
+    if (lastChangeTime[idx] == 0) {
+      lastChangeTime[idx] = now;  // Catat awal transisi (hanya SEKALI)
+    }
+    if (now - lastChangeTime[idx] >= BUTTON_DEBOUNCE) {
+      stableState[idx] = raw;       // Terima state baru setelah stabil
+      lastChangeTime[idx] = 0;      // Reset untuk transisi berikutnya
+    }
+  } else {
+    lastChangeTime[idx] = 0;        // Kembali ke state stabil — reset timer
+  }
+  return stableState[idx];
+}
 // Fungsi untuk mendeteksi tekan (transisi HIGH->LOW)
 bool buttonPressed(int pin) {
   static int prevState[4] = {HIGH, HIGH, HIGH, HIGH};
@@ -287,6 +298,9 @@ void loop() {
         processSerialCommand(cmd);
     }
 
+    // Proses UI dan tombol SEBELUM jamming agar responsif
+    processUI();
+
     // Jalankan jamming jika aktif
     if (jamming) {
         jamLoop();
@@ -295,9 +309,8 @@ void loop() {
         delay(10);
     }
 
-    // Proses UI dan tombol
-    processUI();
-    updateUI();  // Hanya menggambar jika needRedraw true
+    // Update display (hanya menggambar jika needRedraw true)
+    updateUI();
 
     // Jika watchdog trigger, restart otomatis (tidak terjadi jika loop berjalan)
     if (watchdogTriggered) {
@@ -449,27 +462,27 @@ void updateUI() {
     }
     case SUB_AGGRESSIVE: {
       const char* opts[] = {"OFF", "ON"};
-      drawSubMenu(SUB_AGGRESSIVE, "Aggressive", opts, 2, aggressiveMode ? 1 : 0);
+      drawSubMenu(SUB_AGGRESSIVE, "Aggressive", opts, 2, subOption);
       break;
     }
     case SUB_TURBO: {
       const char* opts[] = {"OFF", "ON"};
-      drawSubMenu(SUB_TURBO, "Turbo", opts, 2, turboMode ? 1 : 0);
+      drawSubMenu(SUB_TURBO, "Turbo", opts, 2, subOption);
       break;
     }
     case SUB_STORM: {
       const char* opts[] = {"OFF", "ON"};
-      drawSubMenu(SUB_STORM, "Storm", opts, 2, stormMode ? 1 : 0);
+      drawSubMenu(SUB_STORM, "Storm", opts, 2, subOption);
       break;
     }
     case SUB_RANDHOP: {
       const char* opts[] = {"OFF", "ON"};
-      drawSubMenu(SUB_RANDHOP, "RandHop", opts, 2, randomHop ? 1 : 0);
+      drawSubMenu(SUB_RANDHOP, "RandHop", opts, 2, subOption);
       break;
     }
     case SUB_BLAST: {
       const char* opts[] = {"OFF", "ON"};
-      drawSubMenu(SUB_BLAST, "Blast", opts, 2, blastMode ? 1 : 0);
+      drawSubMenu(SUB_BLAST, "Blast", opts, 2, subOption);
       break;
     }
     case SUB_HOPDWELL:
@@ -560,9 +573,8 @@ void processUI() {
       needRedraw = true;
     } else if (currentState == SUB_AGGRESSIVE || currentState == SUB_TURBO || currentState == SUB_STORM || 
                currentState == SUB_RANDHOP || currentState == SUB_BLAST) {
-      // Toggle value, akan di-set saat RIGHT ditekan
-      // kita hanya ubah nilai sementara? Lebih mudah langsung toggle saat RIGHT
-      // Untuk sekarang, UP/DOWN tidak berpengaruh untuk toggle, biarkan saja.
+      subOption = (subOption + 1) % 2;  // Toggle ON/OFF
+      needRedraw = true;
     }
   }
   else if (buttonPressed(BTN_DOWN)) {
@@ -585,6 +597,10 @@ void processUI() {
     } else if (currentState == SUB_POWER || currentState == SUB_RATE || currentState == SUB_BAND) {
       subOption = (subOption - 1 + (currentState == SUB_POWER ? 4 : (currentState == SUB_RATE ? 3 : 4))) % (currentState == SUB_POWER ? 4 : (currentState == SUB_RATE ? 3 : 4));
       needRedraw = true;
+    } else if (currentState == SUB_AGGRESSIVE || currentState == SUB_TURBO || currentState == SUB_STORM || 
+               currentState == SUB_RANDHOP || currentState == SUB_BLAST) {
+      subOption = (subOption - 1 + 2) % 2;  // Toggle ON/OFF
+      needRedraw = true;
     }
   }
   else if (buttonPressed(BTN_RIGHT)) {
@@ -598,11 +614,11 @@ void processUI() {
         case 1: currentState = SUB_CHANNEL; editValue = currentChannel; needRedraw = true; break;
         case 2: currentState = SUB_POWER; subOption = (powerStr == "MAX" ? 0 : powerStr == "HIGH" ? 1 : powerStr == "LOW" ? 2 : 3); needRedraw = true; break;
         case 3: currentState = SUB_RATE; subOption = (rateStr == "250KBPS" ? 0 : rateStr == "1MBPS" ? 1 : 2); needRedraw = true; break;
-        case 4: currentState = SUB_AGGRESSIVE; needRedraw = true; break;
-        case 5: currentState = SUB_TURBO; needRedraw = true; break;
-        case 6: currentState = SUB_STORM; needRedraw = true; break;
-        case 7: currentState = SUB_RANDHOP; needRedraw = true; break;
-        case 8: currentState = SUB_BLAST; needRedraw = true; break;
+        case 4: currentState = SUB_AGGRESSIVE; subOption = aggressiveMode ? 1 : 0; needRedraw = true; break;
+        case 5: currentState = SUB_TURBO; subOption = turboMode ? 1 : 0; needRedraw = true; break;
+        case 6: currentState = SUB_STORM; subOption = stormMode ? 1 : 0; needRedraw = true; break;
+        case 7: currentState = SUB_RANDHOP; subOption = randomHop ? 1 : 0; needRedraw = true; break;
+        case 8: currentState = SUB_BLAST; subOption = blastMode ? 1 : 0; needRedraw = true; break;
         case 9: currentState = SUB_HOPDWELL; editValue = hopDwell; needRedraw = true; break;
         case 10: currentState = SUB_HOPRANGE; editMin = hopMin; editMax = hopMax; subOption = 0; needRedraw = true; break;
         case 11: currentState = SUB_BAND; 
@@ -726,65 +742,65 @@ void processUI() {
 // JAMMING LOOP - INTI AGRESIF
 // ============================================
 void jamLoop() {
+    // ===== BLAST MODE: carrier tetap =====
     if (blastMode) {
-        // Mode BLAST: carrier terus menerus pada satu channel
         radio.startConstCarrier(powerLevel, currentChannel);
-        // Tidak ada delay, loop akan terus menerus mempertahankan carrier
-        // tapi kita harus tetap memberi kesempatan untuk membaca serial,
-        // jadi kita hanya delay 1 µs agar tidak memonopoli CPU.
         delayMicroseconds(1);
+        processUI();  // Cek tombol selama blast
         return;
     }
 
-    // Mode normal (hopping atau fixed)
-    if (randomHop && !blastMode) {
-        // Random hopping: pilih channel acak dalam range
+    // ===== STEP 1: Pilih channel =====
+    if (randomHop) {
         int ch;
         if (targetBand == "BLE-ADV") {
-            // Fokus hanya pada 3 kanal advertising BLE: 2402 / 2426 / 2480 MHz
             ch = bleAdvCh[random(0, 3)];
         } else {
             ch = random(hopMin, hopMax + 1);
         }
         setChannel(ch);
     } else {
-        // Linear sweep atau fixed (jika hopping mati)
-        if (randomHop == false && jamming) {
-            // Linear sweep dari hopMin ke hopMax
-            static int sweepChannel = hopMin;
-            setChannel(sweepChannel);
-            sweepChannel++;
-            if (sweepChannel > hopMax) sweepChannel = hopMin;
-        } else {
-            // Fixed channel (hopping off, random off) – gunakan currentChannel
-            setChannel(currentChannel);
-        }
+        // Linear sweep
+        static int sweepChannel = hopMin;
+        setChannel(sweepChannel);
+        sweepChannel++;
+        if (sweepChannel > hopMax) sweepChannel = hopMin;
     }
 
-    // Kirim CARRIER (selalu aktif)
-    radio.startConstCarrier(powerLevel, radio.getChannel());
-
-    // Jika stormMode aktif, kirim packet acak setelah carrier
+    // ===== STEP 2: Kirim storm packet SEBELUM carrier =====
+    // (radio.write() TIDAK bisa dipanggil saat constant carrier ON)
     if (stormMode) {
-        // Kirim 5 packet dengan payload acak untuk menambah noise
+        radio.stopConstCarrier(); // Pastikan carrier OFF
         for (int i = 0; i < 5; i++) {
             generateRandomPayload();
             radio.write(randomPayload, 32);
+            if (i % 2 == 0) processUI(); // Cek tombol di sela packet
         }
     }
 
-    // Jeda: jika turboMode, gunakan dwell = 1 µs; jika tidak, pakai hopDwell
+    // ===== STEP 3: Start carrier + dwell =====
+    radio.startConstCarrier(powerLevel, currentChannel);
+
     unsigned long dwell = turboMode ? MIN_DWELL_US : hopDwell;
-    if (dwell > 0) {
+    if (dwell > 1000) {
+        // Bagi dwell panjang jadi segmen 1ms agar UI tetap responsif
+        while (dwell > 1000) {
+            delayMicroseconds(1000);
+            dwell -= 1000;
+            processUI();
+            if (!jamming) break;
+        }
+    }
+    if (dwell > 0 && jamming) {
         delayMicroseconds(dwell);
-    } else {
-        // Jika dwell 0, tetap beri kesempatan minimal
-        delayMicroseconds(1);
+    } else if (!jamming) {
+        // Jamming dihentikan di tengah dwell
+        radio.stopConstCarrier();
+        return;
     }
 
-    // Hentikan carrier sebentar agar bisa beralih channel (sangat singkat)
+    // ===== STEP 4: Hentikan carrier =====
     radio.stopConstCarrier();
-    // Tidak ada delay tambahan, langsung lanjut ke channel berikutnya
 }
 
 // ============================================
