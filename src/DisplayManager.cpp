@@ -69,6 +69,38 @@ uint16_t DisplayManager::getSignalColor(uint8_t level) {
 }
 
 // =============================================================================
+// MENU ITEM HELPER (single row renderer)
+// =============================================================================
+void DisplayManager::drawMenuItem(int index, bool selected) {
+    int y = 20 + (index * 18);
+
+    // Clear any previous state in this row first
+    tft.fillRect(6, y - 2, 148, 15, ST77XX_BLACK);
+
+    if (selected) {
+        tft.fillRect(6, y - 2, 148, 15, 0x2124); // Highlight box
+        tft.setTextColor(ST77XX_YELLOW, 0x2124);
+        tft.setCursor(10, y + 1);
+        tft.print("> ");
+    } else {
+        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+        tft.setCursor(10, y + 1);
+        tft.print("  ");
+    }
+    tft.print(menuTitles[index]);
+}
+
+// =============================================================================
+// PARTIAL MENU REDRAW (only the two affected items)
+// =============================================================================
+void DisplayManager::redrawMenuItems(int oldSel, int newSel) {
+    if (oldSel != newSel) {
+        drawMenuItem(oldSel, false);  // un-highlight previously selected
+        drawMenuItem(newSel, true);   // highlight newly selected
+    }
+}
+
+// =============================================================================
 // RENDER MAIN MENU (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderMainMenu() {
@@ -76,7 +108,7 @@ void DisplayManager::renderMainMenu() {
     
     // Header Banner
     tft.fillRect(0, 0, 160, 14, 0x10A2); // Dark cyan banner
-    String headerText = "=== RF24 SUITE ===";
+    String headerText = "==== RF24 SUITE ====";
     tft.setTextSize(1);
     int16_t headerWidth = headerText.length() * 6;
     int16_t headerX = (160 - headerWidth) / 2;
@@ -86,18 +118,7 @@ void DisplayManager::renderMainMenu() {
 
     // Menu List (Spacing 18px)
     for (int i = 0; i < NUM_MENU_ITEMS; i++) {
-        int y = 20 + (i * 18);
-        if (i == menuSelection) {
-            tft.fillRect(6, y - 2, 148, 15, 0x2124); // Highlight box
-            tft.setTextColor(ST77XX_YELLOW, 0x2124);
-            tft.setCursor(10, y + 1);
-            tft.print("> ");
-        } else {
-            tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-            tft.setCursor(10, y + 1);
-            tft.print("  ");
-        }
-        tft.print(menuTitles[i]);
+        drawMenuItem(i, i == menuSelection);
     }
 
     // Footer
@@ -486,9 +507,13 @@ void DisplayManager::renderRebootScreen() {
 void DisplayManager::updateUI() {
     switch (appState.appMode) {
         case APP_MODE_MENU:
-            if (needRedraw) {
+            if (menuNeedsPartialRedraw) {
+                redrawMenuItems(prevMenuSelection, menuSelection);
+                menuNeedsPartialRedraw = false;
+            } else if (needRedraw) {
                 renderMainMenu();
                 needRedraw = false;
+                menuNeedsPartialRedraw = false;
             }
             break;
         case APP_MODE_JAMMER:
@@ -524,11 +549,13 @@ void DisplayManager::processInput() {
     // -------------------------------------------------------------------------
     if (appState.appMode == APP_MODE_MENU) {
         if (buttonManager.isPressed(BTN_UP)) {
+            prevMenuSelection = menuSelection;
             menuSelection = (menuSelection - 1 + NUM_MENU_ITEMS) % NUM_MENU_ITEMS;
-            needRedraw = true;
+            menuNeedsPartialRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
+            prevMenuSelection = menuSelection;
             menuSelection = (menuSelection + 1) % NUM_MENU_ITEMS;
-            needRedraw = true;
+            menuNeedsPartialRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             if (menuSelection == 0) {
                 appState.appMode = APP_MODE_JAMMER;

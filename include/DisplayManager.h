@@ -21,6 +21,10 @@ private:
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
 
+    // Partial-redraw support for main menu navigation
+    bool menuNeedsPartialRedraw = false;
+    int prevMenuSelection = 0;
+
     // Screen Renderers
     void renderMainMenu();
     void renderJammerScreen();
@@ -33,6 +37,8 @@ private:
     uint16_t getSignalColor(uint8_t level);
     void drawSpectrumGrid();
     void drawSpectrumBars();
+    void drawMenuItem(int index, bool selected);
+    void redrawMenuItems(int oldSel, int newSel);
 };
 
 extern DisplayManager displayManager;
