@@ -48,7 +48,7 @@
 #define DEFAULT_POWER       RF24_PA_MAX
 #define DEFAULT_RATE        RF24_2MBPS    // 2Mbps = performa agresif
 #define MIN_DWELL_US        1
-#define DEFAULT_DWELL_US    10            // 10 µs untuk hopping agresif
+#define DEFAULT_DWELL_US    1            // 1 µs untuk hopping agresif
 
 // Preset Band Target (Frekuensi = 2400 + RF24 Channel dalam MHz)
 #define WIFI_MIN_CH         1             // 2401 MHz - awal band Wi-Fi (ch 1-13)

@@ -5,20 +5,14 @@ RadioManager radioManager;
 RadioManager::RadioManager() : radio(CE_PIN, CSN_PIN) {}
 
 bool RadioManager::init() {
-    // Inisialisasi SPI kustom
     SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, CSN_PIN);
-
-    // Inisialisasi nRF24L01+
     if (!radio.begin()) {
         Serial.println("❌ FATAL: nRF24L01+ tidak terdeteksi!");
         Serial.println("   Periksa kabel dan pinout SPI. Sistem HANG.");
         return false;
     }
-
-    // Default ke TX configuration
     applyTxConfig();
     generateRandomPayload();
-
     Serial.println("✅ Radio nRF24L01+ Siap!");
     Serial.println("   Gunakan Menu Layar atau ketik 'help' di Serial.\n");
     return true;
@@ -26,7 +20,7 @@ bool RadioManager::init() {
 
 void RadioManager::applyTxConfig() {
     radio.stopListening();
-    radio.setPALevel(appState.powerLevel);
+    radio.setPALevel((rf24_pa_dbm_e)appState.powerLevel);
     radio.setDataRate(appState.dataRate);
     radio.setAutoAck(false);
     radio.setRetries(0, 0);
@@ -43,9 +37,9 @@ void RadioManager::enterTxMode() {
 }
 
 void RadioManager::enterRxMode() {
-    radio.stopConstCarrier();
+    radio.stopConstCarrier();          // Hentikan carrier jika aktif
     radio.setAutoAck(false);
-    radio.setPALevel(RF24_PA_MAX); // Sensitivitas maksimal untuk scan
+    radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_2MBPS);
     radio.setCRCLength(RF24_CRC_DISABLED);
     radio.startListening();
@@ -62,9 +56,8 @@ void RadioManager::startJammer(JammerTarget target) {
     appState.setJammerTarget(target);
     enterTxMode();
     radio.powerUp();
-    applyTxConfig();
+    applyTxConfig();   // Pastikan konfigurasi TX
     appState.jamming = true;
-
     Serial.println("🔥 JAMMER AKTIF: " + String(appState.getJammerTargetName()));
     Serial.println("   Frekuensi: " + String(appState.getJammerFreqRangeStr()));
     Serial.println("   Mode Serangan: Packet Storm + Carrier Dwell (Aggressive)\n");
@@ -88,37 +81,53 @@ bool RadioManager::isConnected() {
     return radio.isChipConnected();
 }
 
+// ===================== THE ONLY CORRECT stepJammer() =====================
 void RadioManager::stepJammer(YieldCallback yieldCb) {
     if (!appState.jamming) return;
 
-    // Pastikan berada di mode TX
+    // Pastikan TX mode
     if (rxModeActive) {
         enterTxMode();
     }
 
-    // 1. Pemilihan Kanal Berdasarkan Target
-    int ch;
+    // 1. Pilih kanal
+    uint8_t ch;
     if (appState.jammerTarget == JAM_TARGET_BLE_ADV) {
-        ch = BLE_ADV_CHANNELS[random(0, 3)];
+        ch = (uint8_t)BLE_ADV_CHANNELS[random(0, 3)];
     } else {
-        ch = random(appState.jammerMinCh, appState.jammerMaxCh + 1);
+        ch = (uint8_t)random(appState.jammerMinCh, appState.jammerMaxCh + 1);
     }
     appState.currentJamChannel = ch;
     radio.setChannel(ch);
+    radio.setPALevel((rf24_pa_dbm_e)appState.powerLevel);  // Pastikan PA level sesuai
 
-    // 2. Serangan Packet Storm (Inject dummy frames)
-    radio.stopConstCarrier();
+    // 2. Packet Storm – dengan flush untuk mencegah TX FIFO macet
+    radio.stopConstCarrier();  // Matikan carrier sebelum packet burst
     for (int i = 0; i < 5; i++) {
         generateRandomPayload();
-        radio.write(appState.randomPayload, PAYLOAD_SIZE);
+        bool success = radio.write(appState.randomPayload, PAYLOAD_SIZE);
+        if (!success) {
+            radio.flush_tx();
+        }
         if (i % 2 == 0 && yieldCb) yieldCb();
     }
 
-    // 3. Serangan Carrier Wave (Interferensi Sinyal Berkelanjutan)
-    radio.startConstCarrier(appState.powerLevel, ch);
-    delayMicroseconds(appState.hopDwellUs);
+    // 3. Carrier Wave – PARAMETER YANG BENAR: (channel, power)
+    //    Channel = ch, Power = appState.powerLevel
+    // startConstCarrier expects (power, channel) in this RF24 implementation
+    radio.startConstCarrier((rf24_pa_dbm_e)appState.powerLevel, ch);
+
+    // 4. Dwell time dengan safe delay (handle overflow > 16383 us)
+    uint32_t dwell = appState.hopDwellUs;
+    if (dwell > 16383UL) {
+        delay(dwell / 1000);
+        delayMicroseconds(dwell % 1000);
+    } else {
+        delayMicroseconds(dwell);
+    }
     radio.stopConstCarrier();
 }
+// ========================================================================
 
 void RadioManager::scanSpectrum(YieldCallback yieldCb) {
     if (!rxModeActive) {
@@ -133,7 +142,7 @@ void RadioManager::scanSpectrum(YieldCallback yieldCb) {
 
     for (int ch = minCh; ch <= maxCh; ch++) {
         radio.setChannel(ch);
-        delayMicroseconds(35); // Waktu stabilisasi PLL Synthesizer
+        delayMicroseconds(35);
 
         int hits = 0;
         for (int s = 0; s < SPECTRUM_SAMPLES_PER_CH; s++) {
@@ -155,7 +164,6 @@ void RadioManager::scanSpectrum(YieldCallback yieldCb) {
             highestCh = ch;
         }
 
-        // Beri kesempatan tombol/UI merespons setiap 16 kanal
         if ((ch % 16 == 0) && yieldCb) {
             yieldCb();
         }
