@@ -13,7 +13,7 @@ void AppState::setJammerTarget(JammerTarget target) {
         case JAM_TARGET_BT:
             jammerMinCh = BT_MIN_CH;
             jammerMaxCh = BT_MAX_CH;
-            currentJamChannel = (BT_MIN_CH + BT_MAX_CH) / 2;
+            currentJamChannel = bluetooth_channels[0];
             break;
         case JAM_TARGET_BLE_ADV:
             jammerMinCh = BT_MIN_CH;
@@ -23,7 +23,7 @@ void AppState::setJammerTarget(JammerTarget target) {
         case JAM_TARGET_BLE_DATA:
             jammerMinCh = BT_MIN_CH;
             jammerMaxCh = BT_MAX_CH;
-            currentJamChannel = 40;
+            currentJamChannel = BLE_DATA_CHANNELS[0];
             break;
         case JAM_TARGET_ALL:
             jammerMinCh = MIN_CHANNEL;
@@ -80,9 +80,9 @@ const char* AppState::getJammerTargetName() const {
 const char* AppState::getJammerFreqRangeStr() const {
     switch (jammerTarget) {
         case JAM_TARGET_WIFI:     return "2401-2484MHz (22M Swp)";
-        case JAM_TARGET_BT:       return "2402-2480MHz (80 Ch)";
+        case JAM_TARGET_BT:       return "2402-2480MHz (21 Ch Targeted)";
         case JAM_TARGET_BLE_ADV:  return "2402/2426/2480 MHz";
-        case JAM_TARGET_BLE_DATA: return "2402-2480MHz (Even Ch)";
+        case JAM_TARGET_BLE_DATA: return "12 Ch (3 Groups)";
         case JAM_TARGET_ALL:      return "2400-2525MHz (0-125)";
         case JAM_TARGET_ZIGBEE:   return "2405-2480MHz (16 Ch)";
         default:                  return "";

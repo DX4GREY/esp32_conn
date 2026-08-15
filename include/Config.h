@@ -55,10 +55,27 @@
 #define BT_MAX_CH           80            // 2480 MHz - akhir band Bluetooth (BR/EDR + BLE)
 
 // 3 Main BLE Advertising Channels (2402, 2426, 2480 MHz)
+// (also referenced as ble_channels / BLE_channels)
 const int BLE_ADV_CHANNELS[3] = {2, 26, 80};
 
-// 21 Main Bluetooth AFH Channels
-const int BT_AFH_CHANNELS[21] = {1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56, 61, 66, 71, 76, 3, 23, 43, 63, 79};
+// 21 Targeted Bluetooth Channels (BR/EDR + BLE data channels for efficient hopping jamming)
+const int BLUETOOTH_CHANNELS_COUNT = 21;
+const byte bluetooth_channels[21] = {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
+
+// BLE Data Channel Groups (3 groups, each near a BLE advertising channel neighborhood)
+const int BLE_DATA_GROUPS_COUNT = 3;
+const int BLE_DATA_CHANNELS_PER_GROUP = 4;
+const byte channelGroup1[4] = {2, 5, 8, 11};
+const byte channelGroup2[4] = {26, 29, 32, 35};
+const byte channelGroup3[4] = {80, 83, 86, 89};
+
+// Combined BLE Data Channels (all 12 channels from the 3 groups)
+const int BLE_DATA_CHANNELS_COUNT = 12;
+const byte BLE_DATA_CHANNELS[12] = {
+    2, 5, 8, 11,       // Group 1 (near advertising channel 2)
+    26, 29, 32, 35,    // Group 2 (near advertising channel 26)
+    80, 83, 86, 89     // Group 3 (near advertising channel 80)
+};
 
 // Fast payload for Packet Storm (5-byte ultra low overhead)
 #define FAST_PAYLOAD_SIZE   5

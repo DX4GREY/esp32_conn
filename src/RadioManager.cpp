@@ -140,11 +140,11 @@ void RadioManager::jammerTaskCode(void *param) {
                 break;
 
             // -----------------------------------------------------------------
-            // 2. TARGET BLUETOOTH (0 - 79 MHz Full Hopping Sweep)
+            // 2. TARGET BLUETOOTH (21 Targeted Channels via bluetooth_channels[])
             // -----------------------------------------------------------------
             case JAM_TARGET_BT:
-                for (int ch = 0; ch < 80 && !self->stopJam; ch++) {
-                    self->radio.setChannel(ch);
+                for (int i = 0; i < BLUETOOTH_CHANNELS_COUNT && !self->stopJam; i++) {
+                    self->radio.setChannel(bluetooth_channels[i]);
                     self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
                 }
                 break;
@@ -160,11 +160,11 @@ void RadioManager::jammerTaskCode(void *param) {
                 break;
 
             // -----------------------------------------------------------------
-            // 4. TARGET BLE DATA (Even Channels 2 - 80)
+            // 4. TARGET BLE DATA (12 Channels from 3 Channel Groups)
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_DATA:
-                for (int ch = 2; ch <= 80 && !self->stopJam; ch += 2) {
-                    self->radio.setChannel(ch);
+                for (int i = 0; i < BLE_DATA_CHANNELS_COUNT && !self->stopJam; i++) {
+                    self->radio.setChannel(BLE_DATA_CHANNELS[i]);
                     self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
                 }
                 break;
