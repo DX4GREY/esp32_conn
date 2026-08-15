@@ -9,7 +9,7 @@ void SerialCommander::init(unsigned long baud) {
     Serial.begin(baud);
     delay(500);
     Serial.println("\n==============================================");
-    Serial.println("   ESP32-S3 RF24 JAMMER & SPECTRUM ANALYZER   ");
+    Serial.println("   ESP32-S3 DUAL-CORE RF24 SUITE & ANALYZER   ");
     Serial.println("==============================================");
     Serial.println("Ketik 'help' untuk daftar perintah serial.\n");
 }
@@ -37,7 +37,7 @@ void SerialCommander::executeCommand(String cmd) {
         if (appState.setJammerTargetByName(targetStr)) {
             radioManager.startJammer(appState.jammerTarget);
         } else {
-            Serial.println("Target tidak valid! Gunakan: jam wifi / jam bt / jam ble / jam all");
+            Serial.println("Target tidak valid! Gunakan: wifi, bt, ble, bledata, all, zigbee");
         }
     }
     else if (lowerCmd == "scan" || lowerCmd == "spectrum") {
@@ -100,7 +100,7 @@ void SerialCommander::printAsciiSpectrum() {
 void SerialCommander::printStatus() {
     Serial.println("\n=== STATUS PERANGKAT & RADIO ===");
     Serial.println("nRF24L01+ : " + String(radioManager.isConnected() ? "✅ TERHUBUNG" : "❌ TIDAK TERDETEKSI"));
-    Serial.println("Mode Jam  : " + String(appState.jamming ? "🔥 AKTIF" : "🛑 BERHENTI"));
+    Serial.println("Mode Jam  : " + String(appState.jamming ? "🔥 AKTIF (Core 0 Task)" : "🛑 BERHENTI"));
     Serial.println("Target    : " + String(appState.getJammerTargetName()));
     Serial.println("Rentang   : " + String(appState.getJammerFreqRangeStr()));
     Serial.println("Peak RF   : Kanal " + String(appState.peakChannel) + " (" + String(appState.peakLevel) + "%)");
@@ -109,11 +109,13 @@ void SerialCommander::printStatus() {
 
 void SerialCommander::printHelp() {
     Serial.println("\n=== DAFTAR PERINTAH SERIAL ===");
-    Serial.println("jam wifi     - Jamming rentang frekuensi Wi-Fi (Ch 1 - 73)");
-    Serial.println("jam bt       - Jamming rentang frekuensi Bluetooth (Ch 2 - 80)");
-    Serial.println("jam ble      - Jamming 3 kanal utama BLE Advertising (Ch 2/26/80)");
-    Serial.println("jam all      - Jamming seluruh pita 2.4 GHz (Ch 0 - 125)");
-    Serial.println("stop         - Menghentikan jamming dan mengembalikan ke mode idle");
+    Serial.println("jam wifi     - Wi-Fi 2.4 GHz 14 Channels (22MHz Bandwidth Sweep)");
+    Serial.println("jam bt       - Bluetooth Classic (0 - 79 MHz Full Hopping)");
+    Serial.println("jam ble      - BLE Advertising Channels (Ch 2, 26, 80)");
+    Serial.println("jam bledata  - BLE Data Channels (Even Ch 2 - 80)");
+    Serial.println("jam all      - Full 2.4 GHz Band / Drone (Ch 0 - 125)");
+    Serial.println("jam zigbee   - Zigbee Band (Ch 11 - 26)");
+    Serial.println("stop         - Menghentikan transmisi jammer");
     Serial.println("scan         - Menjalankan Spectrum Analyzer dan mencetak grafik RF");
     Serial.println("inspect <ch> - Menganalisis aktivitas sinyal pada 1 kanal spesifik");
     Serial.println("status       - Informasi status sistem dan modul radio");

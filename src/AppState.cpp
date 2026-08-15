@@ -20,11 +20,20 @@ void AppState::setJammerTarget(JammerTarget target) {
             jammerMaxCh = BT_MAX_CH;
             currentJamChannel = BLE_ADV_CHANNELS[0];
             break;
+        case JAM_TARGET_BLE_DATA:
+            jammerMinCh = BT_MIN_CH;
+            jammerMaxCh = BT_MAX_CH;
+            currentJamChannel = 40;
+            break;
         case JAM_TARGET_ALL:
-        default:
             jammerMinCh = MIN_CHANNEL;
             jammerMaxCh = MAX_CHANNEL;
             currentJamChannel = (MIN_CHANNEL + MAX_CHANNEL) / 2;
+            break;
+        case JAM_TARGET_ZIGBEE:
+            jammerMinCh = 11;
+            jammerMaxCh = 26;
+            currentJamChannel = 18;
             break;
     }
 }
@@ -43,8 +52,14 @@ bool AppState::setJammerTargetByName(const String& name) {
     } else if (n == "ble" || n == "bleadv" || n == "ble-adv") {
         setJammerTarget(JAM_TARGET_BLE_ADV);
         return true;
-    } else if (n == "all" || n == "full" || n == "allband") {
+    } else if (n == "bledata" || n == "ble-data") {
+        setJammerTarget(JAM_TARGET_BLE_DATA);
+        return true;
+    } else if (n == "all" || n == "full" || n == "drone" || n == "allband") {
         setJammerTarget(JAM_TARGET_ALL);
+        return true;
+    } else if (n == "zigbee") {
+        setJammerTarget(JAM_TARGET_ZIGBEE);
         return true;
     }
     return false;
@@ -52,27 +67,31 @@ bool AppState::setJammerTargetByName(const String& name) {
 
 const char* AppState::getJammerTargetName() const {
     switch (jammerTarget) {
-        case JAM_TARGET_WIFI:    return "Wi-Fi (2.4 GHz)";
-        case JAM_TARGET_BT:      return "Bluetooth (BT)";
-        case JAM_TARGET_BLE_ADV: return "BLE Advertising";
-        case JAM_TARGET_ALL:     return "All 2.4GHz Band";
-        default:                 return "Unknown";
+        case JAM_TARGET_WIFI:     return "Wi-Fi (1-14 Swp)";
+        case JAM_TARGET_BT:       return "Bluetooth (0-79)";
+        case JAM_TARGET_BLE_ADV:  return "BLE Advertising";
+        case JAM_TARGET_BLE_DATA: return "BLE Data (2..80)";
+        case JAM_TARGET_ALL:      return "All Band / Drone";
+        case JAM_TARGET_ZIGBEE:   return "Zigbee (11-26)";
+        default:                  return "Unknown";
     }
 }
 
 const char* AppState::getJammerFreqRangeStr() const {
     switch (jammerTarget) {
-        case JAM_TARGET_WIFI:    return "2401-2473 MHz (Ch 1-73)";
-        case JAM_TARGET_BT:      return "2402-2480 MHz (Ch 2-80)";
-        case JAM_TARGET_BLE_ADV: return "2402/2426/2480 MHz";
-        case JAM_TARGET_ALL:     return "2400-2525 MHz (Ch 0-125)";
-        default:                 return "";
+        case JAM_TARGET_WIFI:     return "2401-2484MHz (22M Swp)";
+        case JAM_TARGET_BT:       return "2402-2480MHz (80 Ch)";
+        case JAM_TARGET_BLE_ADV:  return "2402/2426/2480 MHz";
+        case JAM_TARGET_BLE_DATA: return "2402-2480MHz (Even Ch)";
+        case JAM_TARGET_ALL:      return "2400-2525MHz (0-125)";
+        case JAM_TARGET_ZIGBEE:   return "2405-2480MHz (16 Ch)";
+        default:                  return "";
     }
 }
 
 void AppState::cycleJammerTarget(int direction) {
     int current = (int)jammerTarget;
-    int total = 4;
+    int total = 6;
     current = (current + direction + total) % total;
     setJammerTarget((JammerTarget)current);
 }

@@ -47,8 +47,6 @@
 #define TOTAL_CHANNELS      126           // 0 - 125
 #define DEFAULT_POWER       RF24_PA_MAX
 #define DEFAULT_RATE        RF24_2MBPS    // 2Mbps = performa agresif
-#define MIN_DWELL_US        1
-#define DEFAULT_DWELL_US    1            // 1 µs untuk hopping agresif
 
 // Preset Band Target (Frekuensi = 2400 + RF24 Channel dalam MHz)
 #define WIFI_MIN_CH         1             // 2401 MHz - awal band Wi-Fi (ch 1-13)
@@ -58,6 +56,14 @@
 
 // 3 Kanal Utama Advertising BLE (2402, 2426, 2480 MHz)
 const int BLE_ADV_CHANNELS[3] = {2, 26, 80};
+
+// 21 Kanal Utama Bluetooth AFH
+const int BT_AFH_CHANNELS[21] = {1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56, 61, 66, 71, 76, 3, 23, 43, 63, 79};
+
+// Fast Payload untuk Packet Storm (5-byte ultra low overhead)
+#define FAST_PAYLOAD_SIZE   5
+#define FAST_ADDRESS_WIDTH  3
+const uint8_t FAST_JAM_PAYLOAD[5] = {0xAA, 0x55, 0xAA, 0x55, 0xAA};
 
 // =============================================================================
 // KONFIGURASI ANALYZER & GRAFIK
