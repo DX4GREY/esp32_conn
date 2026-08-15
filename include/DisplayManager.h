@@ -12,6 +12,7 @@ public:
     void processInput();
     void updateUI();
     void requestRedraw();
+    void showSplash();
 
 private:
     Adafruit_ST7735 tft;

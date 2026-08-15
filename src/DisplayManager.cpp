@@ -30,6 +30,37 @@ void DisplayManager::requestRedraw() {
     needRedraw = true;
 }
 
+// =============================================================================
+// SPLASH SCREEN (SHOWN BEFORE THE MAIN MENU)
+// =============================================================================
+void DisplayManager::showSplash() {
+    tft.fillScreen(ST77XX_BLACK);
+
+    // Decorative border frame
+    tft.drawRect(4, 4, 152, 120, ST77XX_DARKGRAY);
+
+    // Title "NRF24 SUITE" (textSize 2, centered)
+    String titleText = "NRF24 SUITE";
+    tft.setTextSize(2);
+    int16_t titleWidth = titleText.length() * 12;  // 6px per char * 2 (textSize)
+    int16_t titleX = (160 - titleWidth) / 2;
+    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+    tft.setCursor(titleX, 50);
+    tft.print(titleText);
+
+    // Subtitle "by Dx4Grey" (textSize 1, centered below the title)
+    String subtitleText = "by Dx4Grey";
+    tft.setTextSize(1);
+    int16_t subtitleWidth = subtitleText.length() * 6;  // 6px per char * 1 (textSize)
+    int16_t subtitleX = (160 - subtitleWidth) / 2;
+    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+    tft.setCursor(subtitleX, 72);
+    tft.print(subtitleText);
+
+    // Keep the splash visible for a moment before the menu appears
+    delay(2500);
+}
+
 uint16_t DisplayManager::getSignalColor(uint8_t level) {
     if (level < 30) return ST77XX_GREEN;
     if (level < 65) return ST77XX_YELLOW;
@@ -45,10 +76,13 @@ void DisplayManager::renderMainMenu() {
     
     // Header Banner
     tft.fillRect(0, 0, 160, 14, 0x10A2); // Dark cyan banner
-    tft.setCursor(24, 3);
-    tft.setTextColor(ST77XX_CYAN, 0x10A2);
+    String headerText = "=== RF24 SUITE ===";
     tft.setTextSize(1);
-    tft.println("=== RF24 SUITE ===");
+    int16_t headerWidth = headerText.length() * 6;
+    int16_t headerX = (160 - headerWidth) / 2;
+    tft.setCursor(headerX, 3);
+    tft.setTextColor(ST77XX_CYAN, 0x10A2);
+    tft.println(headerText);
 
     // Menu List (Spacing 18px)
     for (int i = 0; i < NUM_MENU_ITEMS; i++) {
@@ -80,10 +114,13 @@ void DisplayManager::renderJammerScreen() {
 
     // Header Banner
     tft.fillRect(0, 0, 160, 14, 0x6000); // Dark red banner
-    tft.setCursor(24, 3);
-    tft.setTextColor(ST77XX_WHITE, 0x6000);
+    String headerText = "Jammer Control";
     tft.setTextSize(1);
-    tft.println("RF JAMMER CONTROL");
+    int16_t headerWidth = headerText.length() * 6;
+    int16_t headerX = (160 - headerWidth) / 2;
+    tft.setCursor(headerX, 3);
+    tft.setTextColor(ST77XX_WHITE, 0x6000);
+    tft.println(headerText);
 
     // Target Selection Box (Height 36px)
     tft.drawRect(6, 18, 148, 36, ST77XX_CYAN);
@@ -255,7 +292,11 @@ void DisplayManager::renderChannelInspector() {
         tft.setCursor(24, 3);
         tft.setTextColor(ST77XX_CYAN, 0x0810);
         tft.setTextSize(1);
-        tft.println("CHANNEL INSPECTOR");
+        String headerText = "CHANNEL INSPECTOR";
+        int16_t headerWidth = headerText.length() * 6;
+        int16_t headerX = (160 - headerWidth) / 2;
+        tft.setCursor(headerX, 3);
+        tft.println(headerText);
 
         int ch = appState.inspectedChannel;
         int freq = 2400 + ch;

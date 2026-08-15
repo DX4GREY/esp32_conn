@@ -41,6 +41,9 @@ void setup() {
     // 3. Initialize TFT ST7735 1.8" Display (160x128 Compact)
     displayManager.init();
 
+    // 3b. Show splash screen before entering the menu
+    displayManager.showSplash();
+
     // 4. Initialize nRF24L01+ Radio
     if (!radioManager.init()) {
         while (1) {
