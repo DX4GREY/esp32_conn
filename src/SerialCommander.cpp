@@ -109,11 +109,11 @@ void SerialCommander::printStatus() {
 
 void SerialCommander::printHelp() {
     Serial.println("\n=== SERIAL COMMAND LIST ===");
-    Serial.println("jam wifi     - Wi-Fi 2.4 GHz 14 Channels (22MHz Bandwidth Sweep)");
-    Serial.println("jam bt       - Bluetooth Classic (0 - 79 MHz Full Hopping)");
-    Serial.println("jam ble      - BLE Advertising Channels (Ch 2, 26, 80)");
-    Serial.println("jam bledata  - BLE Data Channels (Even Ch 2 - 80)");
-    Serial.println("jam all      - Full 2.4 GHz Band / Drone (Ch 0 - 125)");
+    Serial.println("jam wifi     - Wi-Fi 2.4 GHz (50 Programmed Channels)");
+    Serial.println("jam bt       - Bluetooth Classic (Ch 1-80 Even+Odd Hop)");
+    Serial.println("jam ble      - BLE Advertising (Ch 1-3, 25-27, 79-81)");
+    Serial.println("jam bledata  - BLE Data (12 Ch from 3 Groups)");
+    Serial.println("jam all      - Full 2.4 GHz Band / Drone (Ch 1 - 100)");
     Serial.println("jam zigbee   - Zigbee Band (Ch 11 - 26)");
     Serial.println("stop         - Stop jammer transmission");
     Serial.println("scan         - Run Spectrum Analyzer and print RF graph");

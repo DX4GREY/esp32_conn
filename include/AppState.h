@@ -17,11 +17,11 @@ enum AppMode {
 };
 
 enum JammerTarget {
-    JAM_TARGET_WIFI = 0,         // Wi-Fi 2.4 GHz Target (14 Channels 22MHz Sweep)
-    JAM_TARGET_BT = 1,           // Bluetooth Classic Target (0 - 79 MHz Sweep)
-    JAM_TARGET_BLE_ADV = 2,      // BLE Advertising Only Target (Ch 2, 26, 80)
-    JAM_TARGET_BLE_DATA = 3,     // BLE Data Only Target (Even Ch 2 - 80)
-    JAM_TARGET_ALL = 4,          // Entire 2.4 GHz Band / Drone Target (Ch 0 - 125)
+    JAM_TARGET_WIFI = 0,         // Wi-Fi 2.4 GHz Target (50 Programmed Channels)
+    JAM_TARGET_BT = 1,           // Bluetooth Classic Target (Ch 1 - 80 Even+Odd Hop)
+    JAM_TARGET_BLE_ADV = 2,      // BLE Advertising Target (Ch 1-3, 25-27, 79-81)
+    JAM_TARGET_BLE_DATA = 3,     // BLE Data Target (12 Ch from 3 Groups)
+    JAM_TARGET_ALL = 4,          // Full 2.4 GHz Band / Drone Target (Ch 1 - 100)
     JAM_TARGET_ZIGBEE = 5        // Zigbee Target (Ch 11 - 26)
 };
 

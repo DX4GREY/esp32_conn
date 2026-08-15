@@ -124,37 +124,35 @@ void RadioManager::jammerTaskCode(void *param) {
     while (!self->stopJam) {
         switch (appState.jammerTarget) {
             // -----------------------------------------------------------------
-            // 1. TARGET WI-FI (14 Channels 22MHz Full Bandwidth Sweep)
+            // 1. TARGET WI-FI (50 Programmed Channels via wifi_channels[])
             // -----------------------------------------------------------------
             case JAM_TARGET_WIFI:
-                for (int channel = 0; channel < 14 && !self->stopJam; channel++) {
-                    int startCh = (channel * 5) + 1;
-                    int endCh = (channel * 5) + 23;
-                    for (int ch = startCh; ch <= endCh && !self->stopJam; ch++) {
-                        if (ch <= MAX_CHANNEL) {
-                            self->radio.setChannel(ch);
-                            self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
-                        }
-                    }
-                }
-                break;
-
-            // -----------------------------------------------------------------
-            // 2. TARGET BLUETOOTH (21 Targeted Channels via bluetooth_channels[])
-            // -----------------------------------------------------------------
-            case JAM_TARGET_BT:
-                for (int i = 0; i < BLUETOOTH_CHANNELS_COUNT && !self->stopJam; i++) {
-                    self->radio.setChannel(bluetooth_channels[i]);
+                for (int i = 0; i < WIFI_CHANNELS_COUNT && !self->stopJam; i++) {
+                    self->radio.setChannel(wifi_channels[i]);
                     self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
                 }
                 break;
 
             // -----------------------------------------------------------------
-            // 3. TARGET BLE ADVERTISING (Channels 2, 26, 80)
+            // 2. TARGET BLUETOOTH (Full 1-80 hop: even channels then odd channels)
+            // -----------------------------------------------------------------
+            case JAM_TARGET_BT:
+                for (int i = 0; i < BLUETOOTH_EVEN_CHANNELS_COUNT && !self->stopJam; i++) {
+                    self->radio.setChannel(bluetooth_even_channels[i]);
+                    self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
+                }
+                for (int i = 0; i < BLUETOOTH_ODD_CHANNELS_COUNT && !self->stopJam; i++) {
+                    self->radio.setChannel(bluetooth_odd_channels[i]);
+                    self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
+                }
+                break;
+
+            // -----------------------------------------------------------------
+            // 3. TARGET BLE ADVERTISING (Ch 37/38/39 + adjacent hops via ble_channels[])
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_ADV:
-                for (int ch = 0; ch < 3 && !self->stopJam; ch++) {
-                    self->radio.setChannel(BLE_ADV_CHANNELS[ch]);
+                for (int i = 0; i < BLE_CHANNELS_COUNT && !self->stopJam; i++) {
+                    self->radio.setChannel(ble_channels[i]);
                     self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
                 }
                 break;
@@ -170,11 +168,11 @@ void RadioManager::jammerTaskCode(void *param) {
                 break;
 
             // -----------------------------------------------------------------
-            // 5. TARGET ALL BAND / DRONE (Channels 0 - 125)
+            // 5. TARGET ALL BAND / DRONE (Channels 1 - 100 via full_channels[])
             // -----------------------------------------------------------------
             case JAM_TARGET_ALL:
-                for (int ch = 0; ch < 125 && !self->stopJam; ch++) {
-                    self->radio.setChannel(ch);
+                for (int i = 0; i < FULL_CHANNELS_COUNT && !self->stopJam; i++) {
+                    self->radio.setChannel(full_channels[i]);
                     self->radio.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
                 }
                 break;

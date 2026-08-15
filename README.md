@@ -23,11 +23,11 @@ License: MIT
 
 ## 🎯 6 Jammer Target Presets
 
-1. **Wi-Fi 2.4 GHz**: 14 Wi-Fi channels with a 22 MHz sweep per channel (`(channel * 5) + 1` to `(channel * 5) + 23`).
-2. **Bluetooth Classic**: 80 frequency channels (0 - 79 MHz).
-3. **BLE Advertising**: 3 main BLE advertising channels (Channels 2, 26, 80).
-4. **BLE Data**: Even BLE Data channels (Channels 2, 4, 6, ..., 80).
-5. **All Band / Drone**: Entire 2.4 GHz frequency band (Channels 0 - 125).
+1. **Wi-Fi 2.4 GHz**: 50 programmed channels (`wifi_channels[]`) covering the 22 MHz Wi-Fi band.
+2. **Bluetooth Classic**: Full hop over all channels 1 - 80 (`bluetooth_odd_channels[]` + `bluetooth_even_channels[]`).
+3. **BLE Advertising**: Channel groups 1-3, 25-27, 79-81 (advertising channels 2/26/80 + adjacent hops, `ble_channels[]`).
+4. **BLE Data**: 12 channels from 3 groups (`BLE_DATA_CHANNELS[]`).
+5. **All Band / Drone**: Full 2.4 GHz band, channels 1 - 100 (`full_channels[]`).
 6. **Zigbee**: Channels 11 - 26 (2405 - 2480 MHz).
 
 ---
@@ -44,11 +44,11 @@ License: MIT
 
 | Command | Description |
 |---|---|
-| `jam wifi` | Wi-Fi 2.4 GHz 14 Channels (22MHz Bandwidth Sweep) |
-| `jam bt` | Bluetooth Classic (0 - 79 MHz Full Sweep) |
-| `jam ble` | BLE Advertising Channels (Ch 2, 26, 80) |
-| `jam bledata` | BLE Data Channels (Even Ch 2 - 80) |
-| `jam all` | Full 2.4 GHz Band / Drone (Ch 0 - 125) |
+| `jam wifi` | Wi-Fi 2.4 GHz (50 Programmed Channels) |
+| `jam bt` | Bluetooth Classic (Ch 1-80 Even+Odd Hop) |
+| `jam ble` | BLE Advertising (Ch 1-3, 25-27, 79-81) |
+| `jam bledata` | BLE Data (12 Ch from 3 Groups) |
+| `jam all` | Full 2.4 GHz Band / Drone (Ch 1 - 100) |
 | `jam zigbee` | Zigbee Band (Ch 11 - 26) |
 | `stop` | Stop jammer transmission |
 | `scan` | Run Spectrum Analyzer and print the RF ASCII graph |
