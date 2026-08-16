@@ -19,67 +19,67 @@ static void applyFastTxConfig(RF24 &r) {
     r.disableDynamicPayloads();
 }
 // =============================================================================
-// FILE-LOCAL SWEEP HELPERS (used by the Core 0 jammer task)
+// FILE-LOCAL MAX-AGGRESSION HELPERS (used by the Core 0 jammer task)
 //
-// The two nRF24L01+ share the same SPI bus, so their SPI transactions
-// serialize with each other, but their RF front-ends radiate in PARALLEL.
-// All helpers keep both radios transmitting simultaneously and honour the
-// volatile `stop` flag at every step so stopJammer() reacts in microseconds.
+// Both nRF24L01+ run in REUSE_TX_PL mode: after a single payload is loaded the
+// chip re-broadcasts it back-to-back while CE stays HIGH = 100% airtime, and
+// hopping only costs a 2-byte SPI write (setChannel) + a cheap reUseTX()
+// re-assertion. The SPI bus is barely touched while the radios blast away.
 // =============================================================================
 namespace {
 
-inline void pushPacket(RF24 &r) {
-    r.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE);
+// Load the payload once and switch the radio into continuous-reuse mode.
+void armContinuousJam(RF24 &r) {
+    r.setChannel(0);
+    r.writeFast(FAST_JAM_PAYLOAD, FAST_PAYLOAD_SIZE); // primer payload on air
+    r.reUseTX();                                      // endless re-transmission
 }
 
-// Split-sweep: radio A takes channel indices [0, 2, 4..], radio B takes
-// [1, 3, 5..] -> both radios radiate on two DIFFERENT frequencies at once,
-// doubling the swept band per full cycle at the same per-radio packet rate.
-void sweepSplit(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
-                const volatile bool &stop) {
-    for (int i = 0; i < count && !stop; i++) {
-        rA.setChannel(channels[i]);
-        pushPacket(rA);
-        i++;
-        if (i < count && !stop) {
-            rB.setChannel(channels[i]);
-            pushPacket(rB);
-        }
-    }
+// One aggressive hop: retune + re-assert reuse + dwell at 100% duty.
+inline void hopAndReuse(RF24 &r, uint8_t ch) {
+    r.setChannel(ch);
+    r.reUseTX();
+    delayMicroseconds(JAMMER_DWELL_US);
 }
 
-// Paired-sweep: two channellists swept in lockstep (e.g. BT even/odd), both
-// radios transmit at the same time on different frequencies.
-void sweepPaired(RF24 &rA, const uint8_t *listA, RF24 &rB, const uint8_t *listB,
-                 int count, const volatile bool &stop) {
-    for (int i = 0; i < count && !stop; i++) {
-        rA.setChannel(listA[i]);
-        pushPacket(rA);
-        if (i < count && !stop) {
-            rB.setChannel(listB[i]);
-            pushPacket(rB);
-        }
-    }
-}
-
-// Dual-burst: BOTH radios hit the same channel (used for BLE advertising,
-// where packet density on the critical advertising channels matters more
-// than widening the sweep).
-void sweepDuo(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
+// Split-sweep: radio A covers even indices, radio B odd -> two frequencies are
+// pounded simultaneously.
+void hopSplit(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
               const volatile bool &stop) {
     for (int i = 0; i < count && !stop; i++) {
-        rA.setChannel(channels[i]);
-        pushPacket(rA);
+        hopAndReuse(rA, channels[i]);
+        i++;
         if (i < count && !stop) {
-            rB.setChannel(channels[i]);
-            pushPacket(rB);
+            hopAndReuse(rB, channels[i]);
         }
     }
 }
 
-// ZigBee uses a 9-RF-channel wide sub-band per ZigBee channel. Alternate the
-// RF offsets inside each band across the two radios so they jam in parallel.
-void sweepZigbee(RF24 &rA, RF24 &rB, const volatile bool &stop) {
+// Paired-sweep: two channellists swept in lockstep (e.g. BT even/odd).
+void hopPaired(RF24 &rA, const uint8_t *listA, RF24 &rB, const uint8_t *listB,
+               int count, const volatile bool &stop) {
+    for (int i = 0; i < count && !stop; i++) {
+        hopAndReuse(rA, listA[i]);
+        if (i < count && !stop) {
+            hopAndReuse(rB, listB[i]);
+        }
+    }
+}
+
+// Dual-burst: BOTH radios land on the SAME channel consecutively, doubling the
+// dwell / energy on critical channels (BLE advertising 37/38/39).
+void hopDuo(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
+            const volatile bool &stop) {
+    for (int i = 0; i < count && !stop; i++) {
+        hopAndReuse(rA, channels[i]);
+        if (i < count && !stop) {
+            hopAndReuse(rB, channels[i]);
+        }
+    }
+}
+
+// ZigBee: alternate RF offsets inside every ZigBee band across the two radios.
+void hopZigbee(RF24 &rA, RF24 &rB, const volatile bool &stop) {
     for (int channel = 11; channel < 27 && !stop; channel++) {
         int startCh = 4 + 5 * (channel - 11);
         int endCh = (5 + 5 * (channel - 11)) + 2;
@@ -88,13 +88,11 @@ void sweepZigbee(RF24 &rA, RF24 &rB, const volatile bool &stop) {
         while (ch <= endCh && !stop) {
             if (ch > MAX_CHANNEL) break;
 
-            rA.setChannel(ch);
-            pushPacket(rA);
+            hopAndReuse(rA, ch);
             ch++;
 
             if (ch <= endCh && ch <= MAX_CHANNEL && !stop) {
-                rB.setChannel(ch);
-                pushPacket(rB);
+                hopAndReuse(rB, ch);
                 ch++;
             }
         }
@@ -106,23 +104,49 @@ void sweepZigbee(RF24 &rA, RF24 &rB, const volatile bool &stop) {
 RadioManager::RadioManager() : radio(CE_PIN, CSN_PIN), radio2(CE_PIN_2, CSN_PIN_2) {}
 
 bool RadioManager::init() {
+    // Ensure both radios start de-asserted. If a module was left in TX (e.g.
+    // after a brownout reset during MAX-AGGRESSION jamming), CE HIGH holds it
+    // transmitting and can stall the next begin(). Pull CE LOW first.
+    radio.ce(LOW);
+    radio2.ce(LOW);
+
     // Initialize the custom SPI bus (shared by both radios, 16 MHz)
     SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, CSN_PIN);
     SPI.setFrequency(16000000);
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
 
-    // Initialize both nRF24L01+ modules (different CSN/CE, same SPI bus)
-    if (!radio.begin(&SPI) || !radio2.begin(&SPI)) {
-        Serial.println("FATAL: nRF24L01+ not detected!");
-        Serial.println("   Check wiring and SPI pinout. System HANG.");
-        return false;
+    // nRF24L01+ modules are famously unresponsive for a few ms right after
+    // power-up or after the 3.3V rail sags (brownout reset under heavy RF load).
+    // A single begin() attempt followed by a hard hang is fragile -- retry with a
+    // settle delay and power-down cleanup between attempts instead.
+    const int MAX_ATTEMPTS = 5;
+    bool okA = false, okB = false;
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; ++attempt) {
+        delay(50); // let the 3.3V rail fully rise / module settle
+
+        // Initialize both nRF24L01+ modules (different CSN/CE, same SPI bus)
+        okA = radio.begin(&SPI);
+        okB = radio2.begin(&SPI);
+        if (okA && okB) {
+            applyTxConfig();
+            Serial.println("nRF24L01+ Dual Radio Ready!");
+            Serial.println("   Use the display menu or type 'help' in Serial.\n");
+            return true;
+        }
+
+        Serial.printf("[init] attempt %d/%d: radio1=%s radio2=%s\n",
+                      attempt, MAX_ATTEMPTS,
+                      okA ? "OK" : "FAIL", okB ? "OK" : "FAIL");
+
+        // Clean up before retrying (begin() may have left the module powered up).
+        radio.powerDown();
+        radio2.powerDown();
     }
 
-    applyTxConfig();
-    Serial.println("nRF24L01+ Dual Radio Ready!");
-    Serial.println("   Use the display menu or type 'help' in Serial.\n");
-    return true;
+    Serial.println("FATAL: nRF24L01+ not detected after 5 attempts!");
+    Serial.println("   Check wiring, 3.3V supply and decoupling caps.\n");
+    return false;
 }
 
 void RadioManager::applyTxConfig() {
@@ -180,6 +204,11 @@ void RadioManager::startJammer(JammerTarget target) {
     // Full deterministic TX-handler state, including CE HIGH
     enterTxMode();
 
+    // Max-aggression arming: both radios enter continuous REUSE_TX_PL mode and
+    // stream at 100% airtime; the task loop only hops channels afterwards.
+    armContinuousJam(radio);
+    armContinuousJam(radio2);
+
     appState.jamming = true;
 
     // Launch the ultra-fast aggressive transmission task on Core 0
@@ -236,11 +265,12 @@ bool RadioManager::isConnected() {
 }
 
 // =============================================================================
-// FREERTOS TASK: CORE 0 ULTRA-FAST DUAL-RADIO TRANSMISSION LOOP
+// FREERTOS TASK: CORE 0 MAX-AGGRESSION DUAL-RADIO TRANSMISSION LOOP
 //
-// EnterTxMode() already left CE HIGH, so writeFast() below fills the TX FIFO
-// and the radio slips packets onto the air automatically while the FIFO
-// drains - the loop is never blocked and both radios can stream in parallel.
+// Both radios were armed in REUSE_TX_PL mode (see armContinuousJam) and CE is
+// HIGH, so they continuously blast the last payload at 100% airtime. This loop
+// only retunes channels - each channel is hammered for JAMMER_DWELL_US before
+// hopping, and stopJam is re-checked at every hop boundary.
 // =============================================================================
 void RadioManager::jammerTaskCode(void *param) {
     RadioManager *self = static_cast<RadioManager*>(param);
@@ -252,41 +282,41 @@ void RadioManager::jammerTaskCode(void *param) {
         switch (appState.jammerTarget) {
             // -----------------------------------------------------------------
             // 1. TARGET WI-FI (50 Programmed Channels via wifi_channels[])
-            //    Both radios sweep DIFFERENT halves simultaneously.
+            //    Both radios hammer DIFFERENT halves simultaneously.
             // -----------------------------------------------------------------
             case JAM_TARGET_WIFI:
-                sweepSplit(self->radio, self->radio2, wifi_channels,
-                           WIFI_CHANNELS_COUNT, stop);
+                hopSplit(self->radio, self->radio2, wifi_channels,
+                         WIFI_CHANNELS_COUNT, stop);
                 break;
 
             // -----------------------------------------------------------------
             // 2. TARGET BLUETOOTH (Full 1-80 hop)
-            //    Radio1 sweeps even channels, radio2 odd channels IN LOCKSTEP,
+            //    Radio1 pounds even channels, radio2 odd channels IN LOCKSTEP,
             //    so both transceivers radiate at the same time.
             // -----------------------------------------------------------------
             case JAM_TARGET_BT:
-                sweepPaired(self->radio, bluetooth_even_channels,
-                            self->radio2, bluetooth_odd_channels,
-                            BLUETOOTH_EVEN_CHANNELS_COUNT, stop);
+                hopPaired(self->radio, bluetooth_even_channels,
+                          self->radio2, bluetooth_odd_channels,
+                          BLUETOOTH_EVEN_CHANNELS_COUNT, stop);
                 break;
 
             // -----------------------------------------------------------------
             // 3. TARGET BLE ADVERTISING (Ch 37/38/39 = RF 2/26/80 + hops)
-            //    Both radios blast the SAME channels = 2x packet density on
-            //    the critical advertising frequencies.
+            //    Both radios land on EVERY channel together = 2x dwell/energy
+            //    on the critical advertising frequencies.
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_ADV:
-                sweepDuo(self->radio, self->radio2, ble_channels,
-                         BLE_CHANNELS_COUNT, stop);
+                hopDuo(self->radio, self->radio2, ble_channels,
+                       BLE_CHANNELS_COUNT, stop);
                 break;
 
             // -----------------------------------------------------------------
             // 4. TARGET BLE DATA (12 Channels from 3 Channel Groups)
-            //    Split sweep across both radios for 2x coverage.
+            //    Split hop across both radios for 2x coverage.
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_DATA:
-                sweepSplit(self->radio, self->radio2, BLE_DATA_CHANNELS,
-                           BLE_DATA_CHANNELS_COUNT, stop);
+                hopSplit(self->radio, self->radio2, BLE_DATA_CHANNELS,
+                         BLE_DATA_CHANNELS_COUNT, stop);
                 break;
 
             // -----------------------------------------------------------------
@@ -294,8 +324,8 @@ void RadioManager::jammerTaskCode(void *param) {
             //    Split across both radios: each sweep cycle covers 2x the band.
             // -----------------------------------------------------------------
             case JAM_TARGET_ALL:
-                sweepSplit(self->radio, self->radio2, full_channels,
-                           FULL_CHANNELS_COUNT, stop);
+                hopSplit(self->radio, self->radio2, full_channels,
+                         FULL_CHANNELS_COUNT, stop);
                 break;
 
             // -----------------------------------------------------------------
@@ -304,7 +334,7 @@ void RadioManager::jammerTaskCode(void *param) {
             //    the two radios for parallel band coverage.
             // -----------------------------------------------------------------
             case JAM_TARGET_ZIGBEE:
-                sweepZigbee(self->radio, self->radio2, stop);
+                hopZigbee(self->radio, self->radio2, stop);
                 break;
         }
         vTaskDelay(1); // Yield 1 tick so Core 0 IDLE0 can reset the Task Watchdog

@@ -133,10 +133,18 @@ const byte BLE_DATA_CHANNELS[12] = {
     80, 83, 86, 89     // Group 3 (near advertising channel 80)
 };
 
-// Fast payload for Packet Storm (5-byte ultra low overhead)
-#define FAST_PAYLOAD_SIZE   5
+// Fast payload for MAX-AGGRESSION Packet Storm (1-byte ultra low overhead)
+// On-air packet @2Mbps: preamble(1) + addr(3) + payload(1) + CRC(off)
+//                       = 5 bytes ~= 20 us -> maximum repetition rate.
+#define FAST_PAYLOAD_SIZE   1
 #define FAST_ADDRESS_WIDTH  3
-const uint8_t FAST_JAM_PAYLOAD[5] = {0xAA, 0x55, 0xAA, 0x55, 0xAA};
+const uint8_t FAST_JAM_PAYLOAD[1] = {0xAA};
+
+// JAMMER AGGRESSION: continuous-transmission dwell per channel (microseconds).
+// Every visited channel is hammered at 100% duty for this long (REUSE mode)
+// before hopping. Higher = harder bang per channel, lower = quicker revisit.
+// Recommended: 100-400 us. Wi-Fi/ALL sweeps: 200 us is a good default.
+#define JAMMER_DWELL_US     200
 
 // =============================================================================
 // ANALYZER & GRAPH CONFIGURATION

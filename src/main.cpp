@@ -44,11 +44,14 @@ void setup() {
     // 3b. Show splash screen before entering the menu
     displayManager.showSplash();
 
-    // 4. Initialize nRF24L01+ Radio
+    // 4. Initialize nRF24L01+ Radio (init() retries internally before failing)
     if (!radioManager.init()) {
-        while (1) {
-            delay(1000);
-        }
+        // Don't hard-hang the system. The MAX-AGGRESSION RF load can briefly
+        // brownout / lock the modules; a clean reboot retries init instead of
+        // bricking the device until a manual power cycle.
+        Serial.println("Radio init failed. Rebooting to retry...");
+        delay(2000);
+        ESP.restart();
     }
 
     // 5. Initialize Hardware Watchdog (3.0s Timeout)
