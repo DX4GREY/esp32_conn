@@ -27,6 +27,7 @@ public:
 
 private:
     RF24 radio;
+    RF24 radio2;
     bool rxModeActive = false;
     TaskHandle_t jammerTaskHandle = NULL;
     volatile bool stopJam = false;

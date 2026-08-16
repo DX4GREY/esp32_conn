@@ -13,6 +13,10 @@
 #define MOSI_PIN 11
 #define MISO_PIN 13
 
+// Radio nRF24L01+ (SPI kustom ESP32-S3, second radio)
+#define CE_PIN_2  4
+#define CSN_PIN_2 2
+
 // Display TFT ST7735 1.8" (128x160 SPI)
 #define TFT_SCK   18
 #define TFT_SDA   17

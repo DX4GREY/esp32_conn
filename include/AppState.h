@@ -41,7 +41,7 @@ struct AppState {
 
     // ----- JAMMER STATE -----
     volatile bool jamming = false;
-    JammerTarget jammerTarget = JAM_TARGET_WIFI;
+    volatile JammerTarget jammerTarget = JAM_TARGET_WIFI;
     int jammerMinCh = WIFI_MIN_CH;
     int jammerMaxCh = WIFI_MAX_CH;
     int currentJamChannel = 37;
