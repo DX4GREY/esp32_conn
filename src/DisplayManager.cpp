@@ -6,13 +6,14 @@
 DisplayManager displayManager;
 
 static const char* menuTitles[] = {
-    "1. Jammer Frequency",
+    "1. Jammer Control",
     "2. Spectrum Analyzer",
     "3. Channel Inspector",
-    "4. Device Status",
-    "5. Reboot System"
+    "4. RF Power & Dwell",
+    "5. Device Status",
+    "6. Reboot System"
 };
-static const int NUM_MENU_ITEMS = 5;
+static const int NUM_MENU_ITEMS = 6;
 
 DisplayManager::DisplayManager()
     : tft(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST) {}
@@ -90,13 +91,13 @@ uint16_t DisplayManager::getSignalColor(uint8_t level) {
 // MENU ITEM HELPER (single row renderer)
 // =============================================================================
 void DisplayManager::drawMenuItem(int index, bool selected) {
-    int y = 20 + (index * 18);
+    int y = 16 + (index * 15);
 
     // Clear any previous state in this row first
-    tft.fillRect(6, y - 2, 148, 15, ST77XX_BLACK);
+    tft.fillRect(6, y - 2, 148, 14, ST77XX_BLACK);
 
     if (selected) {
-        tft.fillRect(6, y - 2, 148, 15, 0x2124); // Highlight box
+        tft.fillRect(6, y - 2, 148, 14, 0x2124); // Highlight box
         tft.setTextColor(ST77XX_YELLOW, 0x2124);
         tft.setCursor(10, y + 1);
         tft.print("> ");
@@ -161,20 +162,20 @@ void DisplayManager::renderJammerScreen() {
     tft.setTextColor(ST77XX_WHITE, 0x6000);
     tft.println(headerText);
 
-    // Target Selection Box (Height 36px)
-    tft.drawRect(6, 18, 148, 36, ST77XX_CYAN);
-    tft.setCursor(10, 21);
+    // Target Selection Box (Height 34px)
+    tft.drawRect(6, 17, 148, 34, ST77XX_CYAN);
+    tft.setCursor(10, 20);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("Target: ");
     tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
     tft.println(appState.getJammerTargetName());
 
-    tft.setCursor(10, 33);
+    tft.setCursor(10, 31);
     tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
     tft.println(appState.getJammerFreqRangeStr());
 
-    // Status Box (Active / Standby)
-    int statusY = 58;
+    // Status Box (Active / Standby, Height 34px)
+    int statusY = 54;
     if (appState.jamming) {
         tft.fillRect(6, statusY, 148, 34, ST77XX_RED);
         tft.drawRect(6, statusY, 148, 34, ST77XX_YELLOW);
@@ -195,6 +196,18 @@ void DisplayManager::renderJammerScreen() {
         tft.setTextColor(ST77XX_GRAY, 0x2104);
         tft.print("[ STANDBY ]");
     }
+
+    // Power & Dwell Info
+    tft.setCursor(6, 94);
+    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+    tft.print("RF: ");
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    tft.print(appState.getPowerLevelName());
+    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+    tft.print(" | Dw: ");
+    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+    tft.print(appState.dwellTimeUs);
+    tft.print("us");
 
     // Footer Controls
     tft.setCursor(4, 110);
@@ -428,6 +441,99 @@ void DisplayManager::renderChannelInspector() {
 // =============================================================================
 // RENDER STATUS SCREEN (COMPACT & FIT)
 // =============================================================================
+// =============================================================================
+// RENDER RF SETTINGS SCREEN (POWER LEVEL & DWELL TIME)
+// =============================================================================
+void DisplayManager::renderSettingsScreen() {
+    tft.fillScreen(ST77XX_BLACK);
+
+    // Header Banner
+    tft.fillRect(0, 0, 160, 14, 0x18F5); // Dark Slate Blue
+    tft.setTextSize(1);
+    String headerText = "RF POWER & DWELL";
+    int16_t headerWidth = headerText.length() * 6;
+    int16_t headerX = (160 - headerWidth) / 2;
+    tft.setCursor(headerX, 3);
+    tft.setTextColor(ST77XX_WHITE, 0x18F5);
+    tft.println(headerText);
+
+    // 1. Power Level Box (y = 18 to 56, Height 38px)
+    bool pwrSelected = (settingsSelection == 0);
+    uint16_t pwrBorder = pwrSelected ? ST77XX_YELLOW : ST77XX_DARKGRAY;
+    if (pwrSelected) {
+        tft.fillRect(6, 18, 148, 38, 0x2124);
+    }
+    tft.drawRect(6, 18, 148, 38, pwrBorder);
+
+    tft.setCursor(10, 22);
+    tft.setTextColor(pwrSelected ? ST77XX_YELLOW : ST77XX_GRAY, pwrSelected ? 0x2124 : ST77XX_BLACK);
+    tft.print(pwrSelected ? "> 1. TX Power Level" : "  1. TX Power Level");
+
+    tft.setCursor(16, 34);
+    uint16_t pwrColor = ST77XX_WHITE;
+    if (appState.powerLevel == RF24_PA_MAX) pwrColor = ST77XX_RED;
+    else if (appState.powerLevel == RF24_PA_HIGH) pwrColor = CUSTOM_ORANGE;
+    else if (appState.powerLevel == RF24_PA_LOW) pwrColor = ST77XX_YELLOW;
+    else pwrColor = ST77XX_GREEN;
+
+    tft.setTextColor(pwrColor, pwrSelected ? 0x2124 : ST77XX_BLACK);
+    tft.print("[ ");
+    tft.print(appState.getPowerLevelName());
+    tft.print(" ]");
+
+    tft.setCursor(16, 44);
+    tft.setTextColor(ST77XX_GRAY, pwrSelected ? 0x2124 : ST77XX_BLACK);
+    if (appState.powerLevel == RF24_PA_MAX) {
+        tft.print("Full 0dBm + LNA Boost");
+    } else if (appState.powerLevel == RF24_PA_HIGH) {
+        tft.print("Moderate Jam Range");
+    } else if (appState.powerLevel == RF24_PA_LOW) {
+        tft.print("Close Range Test");
+    } else {
+        tft.print("Low Power Safe Test");
+    }
+
+    // 2. Dwell Time Box (y = 60 to 98, Height 38px)
+    bool dwellSelected = (settingsSelection == 1);
+    uint16_t dwellBorder = dwellSelected ? ST77XX_YELLOW : ST77XX_DARKGRAY;
+    if (dwellSelected) {
+        tft.fillRect(6, 60, 148, 38, 0x2124);
+    }
+    tft.drawRect(6, 60, 148, 38, dwellBorder);
+
+    tft.setCursor(10, 64);
+    tft.setTextColor(dwellSelected ? ST77XX_YELLOW : ST77XX_GRAY, dwellSelected ? 0x2124 : ST77XX_BLACK);
+    tft.print(dwellSelected ? "> 2. Channel Dwell" : "  2. Channel Dwell");
+
+    tft.setCursor(16, 76);
+    tft.setTextColor(ST77XX_CYAN, dwellSelected ? 0x2124 : ST77XX_BLACK);
+    tft.print("[ ");
+    tft.print(appState.getDwellTimeName());
+    tft.print(" ]");
+
+    tft.setCursor(16, 86);
+    tft.setTextColor(ST77XX_GRAY, dwellSelected ? 0x2124 : ST77XX_BLACK);
+    if (appState.dwellTimeUs <= 50) {
+        tft.print("Hyper-fast RF cycle");
+    } else if (appState.dwellTimeUs <= 100) {
+        tft.print("Fast sweep repetition");
+    } else if (appState.dwellTimeUs <= 200) {
+        tft.print("Recommended balanced");
+    } else if (appState.dwellTimeUs <= 500) {
+        tft.print("Heavy airtime impact");
+    } else {
+        tft.print("Long dwell blast / ch");
+    }
+
+    // Footer
+    tft.setCursor(4, 110);
+    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+    tft.print("UP/DN:Sel | RT:Next | B:Menu");
+}
+
+// =============================================================================
+// RENDER STATUS SCREEN (COMPACT & FIT)
+// =============================================================================
 void DisplayManager::renderStatusScreen() {
     tft.fillScreen(ST77XX_BLACK);
 
@@ -443,17 +549,17 @@ void DisplayManager::renderStatusScreen() {
     tft.print("Radio nRF24: ");
     if (radioManager.isConnected()) {
         tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
-        tft.println("CONNECTED (OK)");
+        tft.println("CONNECTED");
     } else {
         tft.setTextColor(ST77XX_RED, ST77XX_BLACK);
-        tft.println("NOT FOUND (ERR)");
+        tft.println("NOT FOUND");
     }
 
     tft.setCursor(8, 34);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("Chipset    : ");
     tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    tft.println("ESP32-S3 DualCore");
+    tft.println("Xtensa");
 
     tft.setCursor(8, 48);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
@@ -471,7 +577,13 @@ void DisplayManager::renderStatusScreen() {
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("Jammer Pwr : ");
     tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    tft.println("MAX (0 dBm)");
+    tft.println(String(appState.getPowerLevelName()));
+
+    tft.setCursor(8, 90);
+    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+    tft.print("Dwell Time : ");
+    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+    tft.println(String(appState.dwellTimeUs) + " us");
 
     tft.setCursor(14, 110);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
@@ -554,6 +666,12 @@ void DisplayManager::updateUI() {
         case APP_MODE_ANALYZER_CHANNEL:
             renderChannelInspector();   // per-frame dynamic update (static part redrawn internally)
             break;
+        case APP_MODE_SETTINGS:
+            if (needRedraw) {
+                renderSettingsScreen();
+                needRedraw = false;
+            }
+            break;
         case APP_MODE_STATUS:
             if (needRedraw) {
                 renderStatusScreen();
@@ -594,8 +712,10 @@ void DisplayManager::processInput() {
                 appState.inspectedPeak = 0;
                 appState.appMode = APP_MODE_ANALYZER_CHANNEL;
             } else if (menuSelection == 3) {
-                appState.appMode = APP_MODE_STATUS;
+                appState.appMode = APP_MODE_SETTINGS;
             } else if (menuSelection == 4) {
+                appState.appMode = APP_MODE_STATUS;
+            } else if (menuSelection == 5) {
                 // Reboot System: stop radio then enter reboot mode
                 radioManager.stopAll();
                 appState.appMode = APP_MODE_REBOOT;
@@ -671,7 +791,27 @@ void DisplayManager::processInput() {
         }
     }
     // -------------------------------------------------------------------------
-    // CONDITION 5: STATUS
+    // CONDITION 5: RF SETTINGS
+    // -------------------------------------------------------------------------
+    else if (appState.appMode == APP_MODE_SETTINGS) {
+        if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
+            settingsSelection = (settingsSelection + 1) % 2;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+            if (settingsSelection == 0) {
+                appState.cyclePowerLevel(1);
+                radioManager.updatePALevel(appState.powerLevel);
+            } else {
+                appState.cycleDwellTime(1);
+            }
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    // -------------------------------------------------------------------------
+    // CONDITION 6: STATUS
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_STATUS) {
         if (buttonManager.isPressed(BTN_B) || buttonManager.isPressed(BTN_RIGHT)) {

@@ -8,6 +8,7 @@ public:
     void executeCommand(String cmd);
     void printHelp();
     void printStatus();
+    void printConfig();
     void printAsciiSpectrum();
 };
 

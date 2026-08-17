@@ -12,6 +12,7 @@ enum AppMode {
     APP_MODE_JAMMER,             // Fast Multi-Target Jammer Mode
     APP_MODE_ANALYZER_SPECTRUM,  // Radio Analyzer Mode: Live RF Spectrum Graph
     APP_MODE_ANALYZER_CHANNEL,   // Radio Analyzer Mode: Deep Inspection of 1 Channel
+    APP_MODE_SETTINGS,           // RF Power & Dwell Time Settings
     APP_MODE_STATUS,             // Device Status Information
     APP_MODE_REBOOT              // System Reboot / Restart
 };
@@ -46,9 +47,10 @@ struct AppState {
     int jammerMaxCh = WIFI_MAX_CH;
     int currentJamChannel = 37;
 
-    // Radio Transmission Parameters (Auto Aggressive)
+    // Radio Transmission Parameters (Dynamic RF Settings)
     rf24_pa_dbm_e powerLevel = DEFAULT_POWER;
     rf24_datarate_e dataRate = DEFAULT_RATE;
+    volatile int dwellTimeUs = JAMMER_DWELL_US;
 
     // ----- ANALYZER STATE -----
     AnalyzerBand analyzerBand = SCAN_BAND_ALL;
@@ -68,6 +70,16 @@ struct AppState {
     const char* getJammerTargetName() const;
     const char* getJammerFreqRangeStr() const;
     void cycleJammerTarget(int direction = 1);
+
+    // RF Settings Helpers
+    void cyclePowerLevel(int direction = 1);
+    bool setPowerLevelByName(const String& name);
+    const char* getPowerLevelName() const;
+    const char* getPowerLevelDbmStr() const;
+
+    void cycleDwellTime(int direction = 1);
+    bool setDwellTime(int us);
+    const char* getDwellTimeName() const;
 
     void cycleAnalyzerBand(int direction = 1);
     const char* getAnalyzerBandName() const;

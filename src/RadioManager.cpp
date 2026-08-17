@@ -11,7 +11,7 @@ static void applyFastTxConfig(RF24 &r) {
     r.setRetries(0, 0);
     r.setPayloadSize(FAST_PAYLOAD_SIZE);
     r.setAddressWidth(FAST_ADDRESS_WIDTH);
-    r.setPALevel(RF24_PA_MAX, true); // true = LNA Gain Enabled!
+    r.setPALevel(appState.powerLevel, true); // true = LNA Gain Enabled!
     r.setDataRate(RF24_2MBPS);
     r.setCRCLength(RF24_CRC_DISABLED);
     r.disableCRC();
@@ -39,7 +39,7 @@ void armContinuousJam(RF24 &r) {
 inline void hopAndReuse(RF24 &r, uint8_t ch) {
     r.setChannel(ch);
     r.reUseTX();
-    delayMicroseconds(JAMMER_DWELL_US);
+    delayMicroseconds(appState.dwellTimeUs);
 }
 
 // Split-sweep: radio A covers even indices, radio B odd -> two frequencies are
@@ -258,6 +258,12 @@ void RadioManager::stopAll() {
     radio.stopListening();
     radio2.stopListening();
     rxModeActive = false;
+}
+
+void RadioManager::updatePALevel(rf24_pa_dbm_e pwr) {
+    appState.powerLevel = pwr;
+    radio.setPALevel(pwr, true);
+    radio2.setPALevel(pwr, true);
 }
 
 bool RadioManager::isConnected() {

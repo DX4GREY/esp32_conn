@@ -22,6 +22,7 @@ public:
 
     // Utility
     void stopAll();
+    void updatePALevel(rf24_pa_dbm_e pwr);
     bool isConnected();
     RF24& getRadio() { return radio; }
 

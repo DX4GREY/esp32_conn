@@ -17,6 +17,7 @@ public:
 private:
     Adafruit_ST7735 tft;
     int menuSelection = 0;
+    int settingsSelection = 0;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -30,6 +31,7 @@ private:
     void renderJammerScreen();
     void renderSpectrumAnalyzer();
     void renderChannelInspector();
+    void renderSettingsScreen();
     void renderStatusScreen();
     void renderRebootScreen();
 

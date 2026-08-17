@@ -1,6 +1,6 @@
 # ESP32-S3 Dual-Core RF24 Jammer & 2.4 GHz Spectrum Analyzer
 
-Version: 3.0 (Dual-Core FreeRTOS Engine)  
+Version: 3.1 (Dual-Core FreeRTOS Engine with Dynamic RF Power & Dwell Tuning)  
 Platform: ESP32-S3  
 Display: TFT ST7735 1.8" (160x128 SPI Compact Layout)  
 License: MIT
@@ -11,11 +11,13 @@ License: MIT
 
 1. **Core 0 (Dedicated RF Transmitter Loop - High Priority)**:
    - Runs the nRF24L01+ transmission loop continuously without pausing (`vTaskPrioritySet(NULL, 3)`).
-   - Packet storm injection with **5-byte payload** (`writeFast`), **3-byte address width**, **CRC Disabled**, and **LNA Gain MAX**.
+   - Packet storm injection with **5-byte payload** (`writeFast`), **3-byte address width**, **CRC Disabled**, and dynamic **PA Level** (MIN, LOW, HIGH, MAX + LNA Gain).
+   - Dynamic **Dwell Time** (`50 µs`, `100 µs`, `200 µs`, `500 µs`, `1000 µs`) per hop.
    - Not affected by screen rendering, Serial delay, or button reads.
 
 2. **Core 1 (UI, Serial CLI, & Spectrum Analyzer Dispatcher)**:
-   - Handles TFT ST7735 1.8" graphics rendering.
+   - Handles TFT ST7735 1.8" graphics rendering with compact, safe UI layouts.
+   - Dedicated **RF Power & Dwell Config** interactive menu screen.
    - Processes physical navigation buttons with 50ms debouncing.
    - Runs the 3.0s Hardware Watchdog for auto-recovery.
 
@@ -32,6 +34,14 @@ License: MIT
 
 ---
 
+## ⚙️ Dynamic RF Power & Dwell Controls
+
+- **TX Power Levels**: `MIN (-18 dBm)`, `LOW (-12 dBm)`, `HIGH (-6 dBm)`, `MAX (0 dBm + LNA Boost)`.
+- **Hopping Dwell Presets**: `50 µs` (Ultra-fast), `100 µs` (Fast), `200 µs` (Balanced default), `500 µs` (Heavy airtime), `1000 µs` (Deep blast).
+- Configurable directly from the **TFT Menu (4. RF Power & Dwell)** or dynamically via **Serial CLI** commands (`power` / `dwell`).
+
+---
+
 ## 📊 Radio Analyzer Features
 
 - **Live Spectrum Graph (160x128)**: Real-time visualization of all 126 channels in the 2.4 GHz band with intensity color gradients and Peak Hold.
@@ -44,14 +54,13 @@ License: MIT
 
 | Command | Description |
 |---|---|
-| `jam wifi` | Wi-Fi 2.4 GHz (50 Programmed Channels) |
-| `jam bt` | Bluetooth Classic (Ch 1-80 Even+Odd Hop) |
-| `jam ble` | BLE Advertising (Ch 1-3, 25-27, 79-81) |
-| `jam bledata` | BLE Data (12 Ch from 3 Groups) |
-| `jam all` | Full 2.4 GHz Band / Drone (Ch 1 - 100) |
-| `jam zigbee` | Zigbee Band (Ch 11 - 26) |
+| `jam <target>` | Jam target: `wifi`, `bt`, `ble`, `bledata`, `all`, `zigbee` |
+| `power [lvl]` | Set / display TX power: `min`, `low`, `high`, `max` (e.g. `power max`) |
+| `dwell [us]` | Set / display hop dwell time: `50`, `100`, `200`, `500`, `1000` |
+| `config` | Display complete RF configuration parameters |
+| `start` | Start jammer on currently selected target |
 | `stop` | Stop jammer transmission |
 | `scan` | Run Spectrum Analyzer and print the RF ASCII graph |
-| `inspect <ch>` | Analyze RF activity on a specific channel |
-| `status` | Show device status & Core 0 task |
-| `help` | Show command help |
+| `inspect <ch>` | Analyze RF activity on a specific channel (0 - 125) |
+| `status` | Show device status, radio connectivity, and Core 0 task |
+| `help` | Show command help list |

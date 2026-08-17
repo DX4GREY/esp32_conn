@@ -146,6 +146,10 @@ const uint8_t FAST_JAM_PAYLOAD[1] = {0xAA};
 // Recommended: 100-400 us. Wi-Fi/ALL sweeps: 200 us is a good default.
 #define JAMMER_DWELL_US     200
 
+// Preset options for Dwell Time (microseconds)
+const int DWELL_PRESETS[] = {50, 100, 200, 500, 1000};
+const int DWELL_PRESETS_COUNT = sizeof(DWELL_PRESETS) / sizeof(DWELL_PRESETS[0]);
+
 // =============================================================================
 // ANALYZER & GRAPH CONFIGURATION
 // =============================================================================

@@ -96,6 +96,85 @@ void AppState::cycleJammerTarget(int direction) {
     setJammerTarget((JammerTarget)current);
 }
 
+void AppState::cyclePowerLevel(int direction) {
+    int cur = (int)powerLevel;
+    // RF24 PA levels: RF24_PA_MIN(0), RF24_PA_LOW(1), RF24_PA_HIGH(2), RF24_PA_MAX(3)
+    cur = (cur + direction + 4) % 4;
+    powerLevel = (rf24_pa_dbm_e)cur;
+}
+
+bool AppState::setPowerLevelByName(const String& name) {
+    String n = name;
+    n.trim();
+    n.toLowerCase();
+
+    if (n == "min" || n == "-18" || n == "-18dbm") {
+        powerLevel = RF24_PA_MIN;
+        return true;
+    } else if (n == "low" || n == "-12" || n == "-12dbm") {
+        powerLevel = RF24_PA_LOW;
+        return true;
+    } else if (n == "high" || n == "-6" || n == "-6dbm") {
+        powerLevel = RF24_PA_HIGH;
+        return true;
+    } else if (n == "max" || n == "0" || n == "0dbm" || n == "full") {
+        powerLevel = RF24_PA_MAX;
+        return true;
+    }
+    return false;
+}
+
+const char* AppState::getPowerLevelName() const {
+    switch (powerLevel) {
+        case RF24_PA_MIN:  return "MIN (-18dBm)";
+        case RF24_PA_LOW:  return "LOW (-12dBm)";
+        case RF24_PA_HIGH: return "HIGH (-6dBm)";
+        case RF24_PA_MAX:  return "MAX (0dBm)";
+        default:           return "MAX (0dBm)";
+    }
+}
+
+const char* AppState::getPowerLevelDbmStr() const {
+    switch (powerLevel) {
+        case RF24_PA_MIN:  return "-18 dBm";
+        case RF24_PA_LOW:  return "-12 dBm";
+        case RF24_PA_HIGH: return "-6 dBm";
+        case RF24_PA_MAX:  return "0 dBm / MAX";
+        default:           return "0 dBm";
+    }
+}
+
+void AppState::cycleDwellTime(int direction) {
+    int idx = 2; // default is 200us (index 2)
+    for (int i = 0; i < DWELL_PRESETS_COUNT; i++) {
+        if (dwellTimeUs == DWELL_PRESETS[i]) {
+            idx = i;
+            break;
+        }
+    }
+    idx = (idx + direction + DWELL_PRESETS_COUNT) % DWELL_PRESETS_COUNT;
+    dwellTimeUs = DWELL_PRESETS[idx];
+}
+
+bool AppState::setDwellTime(int us) {
+    if (us >= 10 && us <= 10000) {
+        dwellTimeUs = us;
+        return true;
+    }
+    return false;
+}
+
+const char* AppState::getDwellTimeName() const {
+    switch (dwellTimeUs) {
+        case 50:   return "50 us (Ultra Fast)";
+        case 100:  return "100 us (Fast)";
+        case 200:  return "200 us (Balanced)";
+        case 500:  return "500 us (Heavy)";
+        case 1000: return "1000 us (1 ms)";
+        default:   return "Custom";
+    }
+}
+
 void AppState::cycleAnalyzerBand(int direction) {
     int current = (int)analyzerBand;
     int total = 3;
