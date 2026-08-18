@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <RF24.h>
+#include <Preferences.h>
 #include "Config.h"
 
 // =============================================================================
@@ -84,8 +85,12 @@ struct AppState {
     void cycleAnalyzerBand(int direction = 1);
     const char* getAnalyzerBandName() const;
     void getAnalyzerChannelRange(int &minCh, int &maxCh) const;
-    void resetPeaks();
+        void resetPeaks();
     void decayPeaks();
+
+    // NVS Persistence
+    void loadSettings();
+    void saveSettings();
 };
 
 extern AppState appState;

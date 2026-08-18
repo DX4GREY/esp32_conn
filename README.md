@@ -1,6 +1,6 @@
 # ESP32-S3 Dual-Core RF24 Jammer & 2.4 GHz Spectrum Analyzer
 
-Version: 3.1 (Dual-Core FreeRTOS Engine with Dynamic RF Power & Dwell Tuning)  
+Version: 3.2 (NVS Persistence + Memory-Optimized Config)    
 Platform: ESP32-S3  
 Display: TFT ST7735 1.8" (160x128 SPI Compact Layout)  
 License: MIT
@@ -47,6 +47,32 @@ License: MIT
 - **Live Spectrum Graph (160x128)**: Real-time visualization of all 126 channels in the 2.4 GHz band with intensity color gradients and Peak Hold.
 - **Channel Inspector**: In-depth monitoring of a single channel with a signal activity gauge bar and carrier detect status.
 - **ASCII Spectrum Scanner**: Print a spectrum graph to the Serial Monitor via the `scan` command.
+
+---
+
+## 💾 NVS Settings Persistence
+Settings are stored in ESP32 flash (NVS) and survive power cycles:
+- **TX Power Level** (min/low/high/max)
+- **Dwell Time** (50–1000 µs)
+- **Active Jammer Target** (wifi, bt, ble, bledata, all, zigbee)
+
+Settings are automatically saved on every change (via TFT menu or Serial CLI) and loaded on boot.
+
+---
+
+## 📁 Project Structure
+
+| File | Description |
+|---|---|
+| `include/Config.h` | Hardware pins, frequency presets, constants (extern declarations) |
+| `src/Config.cpp` | Channel/lookup table definitions (single-definition to save ~112 KB flash) |
+| `include/AppState.h` | Global state struct, enums, NVS method declarations |
+| `src/AppState.cpp` | State logic + NVS load/save persistence |
+| `include/RadioManager.h/.cpp` | Core 0 FreeRTOS jammer task + spectrum scanning |
+| `include/DisplayManager.h/.cpp` | TFT rendering, menu navigation, input processing |
+| `include/ButtonManager.h/.cpp` | 50 ms debounced button edge detection |
+| `include/SerialCommander.h/.cpp` | Interactive CLI monitor & ASCII graph |
+| `include/Watchdog.h/.cpp` | 3 s hardware watchdog for auto-recovery |
 
 ---
 

@@ -32,8 +32,11 @@ void yieldToUI() {
 // SETUP
 // =============================================================================
 void setup() {
-    // 1. Initialize Serial CLI (115200 Baud)
+        // 1. Initialize Serial CLI (115200 Baud)
     serialCommander.init(115200);
+
+    // 1b. Load persisted settings (power level, dwell time, jammer target)
+    appState.loadSettings();
 
     // 2. Initialize Navigation Buttons (Pull-Up)
     buttonManager.init();

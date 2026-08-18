@@ -33,9 +33,10 @@ void AppState::setJammerTarget(JammerTarget target) {
         case JAM_TARGET_ZIGBEE:
             jammerMinCh = 11;
             jammerMaxCh = 26;
-            currentJamChannel = 18;
+                        currentJamChannel = 18;
             break;
     }
+    saveSettings();
 }
 
 bool AppState::setJammerTargetByName(const String& name) {
@@ -99,8 +100,9 @@ void AppState::cycleJammerTarget(int direction) {
 void AppState::cyclePowerLevel(int direction) {
     int cur = (int)powerLevel;
     // RF24 PA levels: RF24_PA_MIN(0), RF24_PA_LOW(1), RF24_PA_HIGH(2), RF24_PA_MAX(3)
-    cur = (cur + direction + 4) % 4;
+        cur = (cur + direction + 4) % 4;
     powerLevel = (rf24_pa_dbm_e)cur;
+    saveSettings();
 }
 
 bool AppState::setPowerLevelByName(const String& name) {
@@ -108,17 +110,21 @@ bool AppState::setPowerLevelByName(const String& name) {
     n.trim();
     n.toLowerCase();
 
-    if (n == "min" || n == "-18" || n == "-18dbm") {
+        if (n == "min" || n == "-18" || n == "-18dbm") {
         powerLevel = RF24_PA_MIN;
+        saveSettings();
         return true;
     } else if (n == "low" || n == "-12" || n == "-12dbm") {
         powerLevel = RF24_PA_LOW;
+        saveSettings();
         return true;
     } else if (n == "high" || n == "-6" || n == "-6dbm") {
         powerLevel = RF24_PA_HIGH;
+        saveSettings();
         return true;
     } else if (n == "max" || n == "0" || n == "0dbm" || n == "full") {
         powerLevel = RF24_PA_MAX;
+        saveSettings();
         return true;
     }
     return false;
@@ -152,13 +158,15 @@ void AppState::cycleDwellTime(int direction) {
             break;
         }
     }
-    idx = (idx + direction + DWELL_PRESETS_COUNT) % DWELL_PRESETS_COUNT;
+        idx = (idx + direction + DWELL_PRESETS_COUNT) % DWELL_PRESETS_COUNT;
     dwellTimeUs = DWELL_PRESETS[idx];
+    saveSettings();
 }
 
 bool AppState::setDwellTime(int us) {
-    if (us >= 10 && us <= 10000) {
+        if (us >= 10 && us <= 10000) {
         dwellTimeUs = us;
+        saveSettings();
         return true;
     }
     return false;
@@ -223,11 +231,34 @@ void AppState::resetPeaks() {
 void AppState::decayPeaks() {
     for (int i = 0; i < TOTAL_CHANNELS; i++) {
         if (peakLevels[i] > spectrumLevels[i]) {
-            if (peakLevels[i] >= PEAK_DECAY_RATE) {
+                        if (peakLevels[i] >= PEAK_DECAY_RATE) {
                 peakLevels[i] -= PEAK_DECAY_RATE;
             } else {
                 peakLevels[i] = 0;
             }
         }
     }
+}
+
+// =============================================================================
+// NVS PERSISTENCE
+// =============================================================================
+void AppState::loadSettings() {
+    Preferences prefs;
+    prefs.begin("appstate", false);
+    powerLevel = (rf24_pa_dbm_e)prefs.getInt("power", DEFAULT_POWER);
+    dwellTimeUs = prefs.getInt("dwell", JAMMER_DWELL_US);
+    jammerTarget = (JammerTarget)prefs.getUChar("target", JAM_TARGET_WIFI);
+    prefs.end();
+    // Recompute jammer channel range & starting channel for the loaded target
+    setJammerTarget(jammerTarget);
+}
+
+void AppState::saveSettings() {
+    Preferences prefs;
+    prefs.begin("appstate", false);
+    prefs.putInt("power", (int)powerLevel);
+    prefs.putInt("dwell", dwellTimeUs);
+    prefs.putUChar("target", (uint8_t)jammerTarget);
+    prefs.end();
 }
