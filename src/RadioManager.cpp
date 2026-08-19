@@ -369,6 +369,7 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
 
     int highestCh = minCh;
     uint8_t highestLvl = 0;
+    const int sampleCount = appState.getSpectrumSampleCount();
 
     auto storeLevel = [&](int ch, uint8_t combined, uint8_t level1, uint8_t level2) {
         appState.spectrumLevels[ch] = combined;
@@ -394,16 +395,16 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
 
             int hits1 = 0;
             int hits2 = 0;
-            for (int s = 0; s < SPECTRUM_SAMPLES_PER_CH; s++) {
+            for (int s = 0; s < sampleCount; s++) {
                 if (radio.testRPD() || radio.testCarrier()) hits1++;
                 if (hasSecondChannel && (radio2.testRPD() || radio2.testCarrier())) hits2++;
                 delayMicroseconds(8);
             }
 
-            const uint8_t level1 = (hits1 * 100) / SPECTRUM_SAMPLES_PER_CH;
+            const uint8_t level1 = (hits1 * 100) / sampleCount;
             storeLevel(ch, level1, level1, 0);
             if (hasSecondChannel) {
-                const uint8_t level2 = (hits2 * 100) / SPECTRUM_SAMPLES_PER_CH;
+                const uint8_t level2 = (hits2 * 100) / sampleCount;
                 storeLevel(ch2, level2, 0, level2);
             }
 
@@ -420,7 +421,7 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
             int hits1 = 0;
             int hits2 = 0;
             int combinedHits = 0;
-            for (int s = 0; s < SPECTRUM_SAMPLES_PER_CH; s++) {
+            for (int s = 0; s < sampleCount; s++) {
                 const bool hit1 = useRadio1 && (radio.testRPD() || radio.testCarrier());
                 const bool hit2 = useRadio2 && (radio2.testRPD() || radio2.testCarrier());
                 if (hit1) hits1++;
@@ -429,9 +430,9 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
                 delayMicroseconds(8);
             }
 
-            const uint8_t level1 = (hits1 * 100) / SPECTRUM_SAMPLES_PER_CH;
-            const uint8_t level2 = (hits2 * 100) / SPECTRUM_SAMPLES_PER_CH;
-            const uint8_t combined = (combinedHits * 100) / SPECTRUM_SAMPLES_PER_CH;
+            const uint8_t level1 = (hits1 * 100) / sampleCount;
+            const uint8_t level2 = (hits2 * 100) / sampleCount;
+            const uint8_t combined = (combinedHits * 100) / sampleCount;
             storeLevel(ch, combined, level1, level2);
 
             if (((ch - minCh) % 16 == 0) && yieldCb) yieldCb();
@@ -441,6 +442,7 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
     appState.peakChannel = highestCh;
     appState.peakLevel = highestLvl;
     appState.decayPeaks();
+    appState.recordCompletedSweep();
 }
 
 uint8_t RadioManager::inspectChannel(int channel) {
@@ -453,15 +455,16 @@ uint8_t RadioManager::inspectChannel(int channel) {
     radio2.setChannel(channel);
     delayMicroseconds(40);
 
+    const int sampleCount = appState.getInspectSampleCount();
     int hits = 0;
-    for (int s = 0; s < INSPECT_SAMPLES; s++) {
+    for (int s = 0; s < sampleCount; s++) {
         if (radio.testRPD() || radio.testCarrier() || radio2.testRPD() || radio2.testCarrier()) {
             hits++;
         }
         delayMicroseconds(12);
     }
 
-    uint8_t lvl = (hits * 100) / INSPECT_SAMPLES;
+    uint8_t lvl = (hits * 100) / sampleCount;
     appState.inspectedLevel = lvl;
 
     if (lvl > appState.inspectedPeak) {

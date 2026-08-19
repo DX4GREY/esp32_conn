@@ -117,7 +117,11 @@ void loop() {
     displayManager.processInput();
 
     // 4. Execute Based on Active Mode
-    if (appState.appMode == APP_MODE_ANALYZER_SPECTRUM) {
+    if (appState.appMode == APP_MODE_ANALYZER_SPECTRUM ||
+        appState.appMode == APP_MODE_WATERFALL ||
+        appState.appMode == APP_MODE_SURVEY ||
+        appState.appMode == APP_MODE_EVENTS ||
+        (appState.appMode == APP_MODE_LOGGING && appState.loggingEnabled)) {
         // Radio Analyzer Mode: Scan 126 channels and update spectrum levels
         radioManager.scanSpectrum(yieldToUI);
     } else if (appState.appMode == APP_MODE_ANALYZER_CHANNEL) {

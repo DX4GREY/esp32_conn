@@ -6,14 +6,21 @@
 DisplayManager displayManager;
 
 static const char* menuTitles[] = {
-    "RF TEST",
     "SPECTRUM",
+    "WATERFALL",
     "INSPECT",
+    "SURVEY",
+    "EVENTS",
+    "LOGGING",
+    "RF TEST",
+    "RADIO DIAG",
+    "PROFILES",
     "SETTINGS",
     "STATUS",
     "POWER"
 };
-static const int NUM_MENU_ITEMS = 6;
+static const int MENU_ITEMS_PER_PAGE = 6;
+static const int NUM_MENU_PAGES = 2;
 
 // Shared modern UI palette (RGB565).
 static constexpr uint16_t SPECTRUM_HEADER_BG = 0x0862;
@@ -211,26 +218,59 @@ void DisplayManager::drawModernFooter(const char* left, const char* middle, cons
 void DisplayManager::drawMenuIcon(int index, int centerX, int centerY,
                                   uint16_t color, uint16_t background) {
     switch (index) {
-        case 0: // RF antenna
-            tft.drawFastVLine(centerX, centerY - 4, 10, color);
-            tft.fillCircle(centerX, centerY - 5, 2, color);
-            tft.drawLine(centerX - 3, centerY + 5, centerX + 3, centerY + 5, color);
-            tft.drawLine(centerX - 5, centerY - 3, centerX - 8, centerY, color);
-            tft.drawLine(centerX + 5, centerY - 3, centerX + 8, centerY, color);
-            break;
-        case 1: // Spectrum bars
+        case 0: // Spectrum bars
             tft.drawFastVLine(centerX - 7, centerY + 1, 5, color);
             tft.drawFastVLine(centerX - 3, centerY - 3, 9, color);
             tft.drawFastVLine(centerX + 1, centerY - 6, 12, color);
             tft.drawFastVLine(centerX + 5, centerY - 1, 7, color);
             tft.drawFastHLine(centerX - 9, centerY + 6, 18, color);
             break;
+        case 1: // Waterfall/history
+            for (int row = 0; row < 4; row++) {
+                tft.drawFastHLine(centerX - 8 + row, centerY - 6 + row * 4,
+                                  16 - row * 2, color);
+            }
+            break;
         case 2: // Magnifier
             tft.drawCircle(centerX - 2, centerY - 2, 6, color);
             tft.drawLine(centerX + 3, centerY + 3, centerX + 8, centerY + 8, color);
             tft.fillCircle(centerX - 2, centerY - 2, 1, color);
             break;
-        case 3: // Sliders
+        case 3: // Survey chart
+            tft.drawFastHLine(centerX - 9, centerY + 6, 18, color);
+            tft.fillRect(centerX - 7, centerY, 3, 6, color);
+            tft.fillRect(centerX - 2, centerY - 4, 3, 10, color);
+            tft.fillRect(centerX + 3, centerY - 1, 3, 7, color);
+            break;
+        case 4: // Event marker
+            tft.drawCircle(centerX, centerY, 7, color);
+            tft.drawLine(centerX, centerY - 5, centerX - 2, centerY + 1, color);
+            tft.drawLine(centerX - 2, centerY + 1, centerX + 3, centerY + 1, color);
+            tft.drawFastVLine(centerX + 3, centerY + 1, 4, color);
+            break;
+        case 5: // Recording/logging
+            tft.drawRoundRect(centerX - 9, centerY - 7, 18, 14, 3, color);
+            tft.fillCircle(centerX, centerY, 4, color);
+            break;
+        case 6: // RF antenna
+            tft.drawFastVLine(centerX, centerY - 4, 10, color);
+            tft.fillCircle(centerX, centerY - 5, 2, color);
+            tft.drawLine(centerX - 3, centerY + 5, centerX + 3, centerY + 5, color);
+            tft.drawLine(centerX - 5, centerY - 3, centerX - 8, centerY, color);
+            tft.drawLine(centerX + 5, centerY - 3, centerX + 8, centerY, color);
+            break;
+        case 7: // Dual-radio diagnostics
+            tft.drawRoundRect(centerX - 9, centerY - 6, 7, 12, 2, color);
+            tft.drawRoundRect(centerX + 2, centerY - 6, 7, 12, 2, color);
+            tft.fillCircle(centerX - 6, centerY + 3, 1, color);
+            tft.fillCircle(centerX + 5, centerY + 3, 1, color);
+            break;
+        case 8: // Profiles
+            tft.drawRoundRect(centerX - 9, centerY - 7, 18, 5, 2, color);
+            tft.drawRoundRect(centerX - 7, centerY, 14, 5, 2, color);
+            tft.drawRoundRect(centerX - 5, centerY + 7, 10, 3, 1, color);
+            break;
+        case 9: // Settings sliders
             tft.drawFastHLine(centerX - 9, centerY - 5, 18, color);
             tft.drawFastHLine(centerX - 9, centerY, 18, color);
             tft.drawFastHLine(centerX - 9, centerY + 5, 18, color);
@@ -241,12 +281,12 @@ void DisplayManager::drawMenuIcon(int index, int centerX, int centerY,
             tft.fillCircle(centerX, centerY + 5, 2, background);
             tft.drawCircle(centerX, centerY + 5, 2, color);
             break;
-        case 4: // Device status
+        case 10: // Device status
             tft.drawRoundRect(centerX - 8, centerY - 7, 16, 14, 3, color);
             tft.fillCircle(centerX, centerY - 3, 1, color);
             tft.drawFastVLine(centerX, centerY, 4, color);
             break;
-        case 5: // Power/reboot
+        case 11: // Power/reboot
             tft.drawCircle(centerX, centerY, 7, color);
             tft.fillRect(centerX - 2, centerY - 8, 5, 7, background);
             tft.drawFastVLine(centerX, centerY - 8, 9, color);
@@ -259,6 +299,7 @@ void DisplayManager::drawMenuItem(int index, bool selected) {
     constexpr int cardHeight = 27;
     const int column = index % 2;
     const int row = index / 2;
+    const int featureIndex = menuPage * MENU_ITEMS_PER_PAGE + index;
     const int x = 4 + column * 78;
     const int y = 16 + row * 29;
     const uint16_t background = selected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
@@ -271,12 +312,21 @@ void DisplayManager::drawMenuItem(int index, bool selected) {
     tft.drawRoundRect(x, y, cardWidth, cardHeight, 4, border);
     if (selected) tft.fillRoundRect(x + 2, y + 5, 3, 17, 1, SPECTRUM_ACCENT);
 
-    drawMenuIcon(index, x + cardWidth / 2, y + 8, iconColor, background);
+    drawMenuIcon(featureIndex, x + cardWidth / 2, y + 8, iconColor, background);
 
-    const int labelX = x + (cardWidth - static_cast<int>(strlen(menuTitles[index])) * 6) / 2;
+    const int labelX = x + (cardWidth - static_cast<int>(strlen(menuTitles[featureIndex])) * 6) / 2;
     tft.setCursor(labelX, y + 17);
     tft.setTextColor(selected ? ST77XX_WHITE : ST77XX_GRAY, background);
-    tft.print(menuTitles[index]);
+    tft.print(menuTitles[featureIndex]);
+
+    if (featureIndex == 4 && appState.eventCount > 0) {
+        tft.fillCircle(x + cardWidth - 8, y + 7, 5, SPECTRUM_HIGH);
+        tft.setCursor(x + cardWidth - 11, y + 4);
+        tft.setTextColor(ST77XX_BLACK, SPECTRUM_HIGH);
+        tft.print(appState.eventCount);
+    } else if (featureIndex == 5 && appState.loggingEnabled) {
+        tft.fillCircle(x + cardWidth - 8, y + 7, 4, SPECTRUM_CRITICAL);
+    }
 }
 
 // =============================================================================
@@ -284,8 +334,8 @@ void DisplayManager::drawMenuItem(int index, bool selected) {
 // =============================================================================
 void DisplayManager::redrawMenuItems(int oldSel, int newSel) {
     if (oldSel != newSel) {
-        drawMenuItem(oldSel, false);  // un-highlight previously selected
-        drawMenuItem(newSel, true);   // highlight newly selected
+        drawMenuItem(oldSel, false);
+        drawMenuItem(newSel, true);
     }
 }
 
@@ -293,14 +343,19 @@ void DisplayManager::redrawMenuItems(int oldSel, int newSel) {
 // RENDER MAIN MENU (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderMainMenu() {
-    drawModernHeader("RF24 TOOLKIT", SPECTRUM_ACCENT);
+    drawModernHeader(menuPage == 0 ? "ANALYZE" : "TOOLS", SPECTRUM_ACCENT);
+    tft.fillRoundRect(137, 2, 20, 10, 3, SPECTRUM_BORDER);
+    tft.setCursor(139, 3);
+    tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_BORDER);
+    tft.print(menuPage + 1);
+    tft.print("/2");
 
     // Six compact feature cards in a 2 x 3 grid.
-    for (int i = 0; i < NUM_MENU_ITEMS; i++) {
+    for (int i = 0; i < MENU_ITEMS_PER_PAGE; i++) {
         drawMenuItem(i, i == menuSelection);
     }
 
-    drawModernFooter("U/D MOVE", "", "R OPEN");
+    drawModernFooter("U/D MOVE", "B PAGE", "R OPEN");
 }
 
 // =============================================================================
@@ -559,6 +614,196 @@ void DisplayManager::renderSpectrumAnalyzer() {
     if (lastSpectrumRenderMs != 0 && now - lastSpectrumRenderMs < 50) return;
     lastSpectrumRenderMs = now;
     drawSpectrumBars();
+}
+
+void DisplayManager::renderWaterfallScreen() {
+    if (needRedraw) {
+        drawModernHeader("WATERFALL", SPECTRUM_ACCENT);
+        tft.fillRect(16, 17, 130, 74, SPECTRUM_CARD_BG);
+        tft.drawRect(16, 17, 130, 74, SPECTRUM_BORDER);
+        tft.setCursor(1, 18);
+        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        tft.print("NEW");
+        tft.setCursor(1, 82);
+        tft.print("OLD");
+        drawModernFooter("U BAND", "R CLEAR", "B BACK");
+        needRedraw = false;
+    }
+
+    tft.fillRect(18, 18, GRAPH_WIDTH, 72, SPECTRUM_CARD_BG);
+    const int count = appState.waterfallCount;
+    for (int row = 0; row < count; row++) {
+        const int source = (appState.waterfallHead - 1 - row + WATERFALL_ROWS) % WATERFALL_ROWS;
+        const int y = 18 + row * 3;
+        for (int ch = 0; ch < TOTAL_CHANNELS; ch++) {
+            const uint8_t level = appState.waterfall[source][ch];
+            const uint16_t color = level == 0 ? SPECTRUM_CARD_BG : getSignalColor(level);
+            tft.drawFastVLine(18 + ch, y, 3, color);
+        }
+    }
+}
+
+void DisplayManager::renderSurveyScreen() {
+    if (needRedraw) {
+        drawModernHeader("CHANNEL SURVEY", SPECTRUM_LOW);
+        tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
+        drawModernFooter("", "R RESET", "B BACK");
+        needRedraw = false;
+    }
+
+    tft.fillRect(9, 20, 142, 79, SPECTRUM_CARD_BG);
+    tft.setCursor(10, 21);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("SWEEPS ");
+    tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
+    tft.print(appState.surveySweeps);
+
+    int ranked[5] = {0, 0, 0, 0, 0};
+    uint8_t rankedLevel[5] = {0, 0, 0, 0, 0};
+    if (appState.surveySweeps > 0) {
+        int minCh, maxCh;
+        appState.getAnalyzerChannelRange(minCh, maxCh);
+        for (int ch = minCh; ch <= maxCh; ch++) {
+            const uint32_t rawAverage = appState.occupancyTotal[ch] / appState.surveySweeps;
+            const uint8_t average = rawAverage > 100 ? 100 : static_cast<uint8_t>(rawAverage);
+            for (int pos = 0; pos < 5; pos++) {
+                if (average > rankedLevel[pos]) {
+                    for (int move = 4; move > pos; move--) {
+                        rankedLevel[move] = rankedLevel[move - 1];
+                        ranked[move] = ranked[move - 1];
+                    }
+                    rankedLevel[pos] = average;
+                    ranked[pos] = ch;
+                    break;
+                }
+            }
+        }
+    }
+
+    for (int row = 0; row < 5; row++) {
+        const int y = 36 + row * 12;
+        tft.setCursor(10, y);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print(row + 1);
+        tft.print("  CH");
+        tft.print(ranked[row]);
+        tft.fillRect(57, y, 72, 7, 0x0862);
+        const int width = map(rankedLevel[row], 0, 100, 0, 72);
+        if (width > 0) tft.fillRect(57, y, width, 7, getSignalColor(rankedLevel[row]));
+        tft.setCursor(132, y);
+        tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+        tft.print(rankedLevel[row]);
+        tft.print("%");
+    }
+}
+
+void DisplayManager::renderEventsScreen() {
+    if (needRedraw) {
+        drawModernHeader("RF EVENTS", SPECTRUM_HIGH);
+        tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
+        drawModernFooter("", "R CLEAR", "B BACK");
+        needRedraw = false;
+    }
+
+    tft.fillRect(9, 20, 142, 79, SPECTRUM_CARD_BG);
+    tft.setCursor(10, 21);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("TRIGGER >=60%   COUNT ");
+    tft.setTextColor(SPECTRUM_HIGH, SPECTRUM_CARD_BG);
+    tft.print(appState.eventCount);
+
+    const int rows = appState.eventCount < 6 ? appState.eventCount : 6;
+    for (int row = 0; row < rows; row++) {
+        const int index = (appState.eventHead - 1 - row + RF_EVENT_COUNT) % RF_EVENT_COUNT;
+        const RfEvent &event = appState.rfEvents[index];
+        const unsigned long ageSec = (millis() - event.timestampMs) / 1000UL;
+        const int y = 36 + row * 10;
+        tft.setCursor(10, y);
+        tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
+        tft.print("CH");
+        tft.print(event.channel);
+        tft.setCursor(61, y);
+        tft.setTextColor(getSignalColor(event.level), SPECTRUM_CARD_BG);
+        tft.print(event.level);
+        tft.print("%");
+        tft.setCursor(108, y);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print(ageSec);
+        tft.print("s");
+    }
+}
+
+void DisplayManager::renderLoggingScreen() {
+    drawModernHeader("SERIAL LOGGING", appState.loggingEnabled ?
+                     SPECTRUM_CRITICAL : SPECTRUM_ACCENT);
+    tft.fillRoundRect(12, 22, 136, 76, 7, SPECTRUM_CARD_BG);
+    tft.drawRoundRect(12, 22, 136, 76, 7, SPECTRUM_BORDER);
+    tft.fillCircle(80, 43, 9, appState.loggingEnabled ?
+                   SPECTRUM_CRITICAL : ST77XX_GRAY);
+    tft.setCursor(appState.loggingEnabled ? 50 : 56, 59);
+    tft.setTextColor(appState.loggingEnabled ? SPECTRUM_CRITICAL : ST77XX_GRAY,
+                     SPECTRUM_CARD_BG);
+    tft.print(appState.loggingEnabled ? "RECORDING" : "STOPPED");
+    tft.setCursor(34, 74);
+    tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+    tft.print("115200 BAUD CSV");
+    tft.setCursor(32, 86);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("1 summary / sweep");
+    drawModernFooter("", "R TOGGLE", "B BACK");
+    needRedraw = false;
+}
+
+void DisplayManager::renderRadioDiagScreen() {
+    drawModernHeader("RADIO DIAGNOSTICS", SPECTRUM_ACCENT);
+    const bool ok1 = radioManager.isRadio1Connected();
+    const bool ok2 = radioManager.isRadio2Connected();
+    for (int radioIndex = 0; radioIndex < 2; radioIndex++) {
+        const int y = 20 + radioIndex * 40;
+        const bool ok = radioIndex == 0 ? ok1 : ok2;
+        tft.fillRoundRect(8, y, 144, 34, 5, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(8, y, 144, 34, 5, ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL);
+        tft.fillCircle(18, y + 10, 4, ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL);
+        tft.setCursor(28, y + 6);
+        tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+        tft.print("NRF24 RADIO ");
+        tft.print(radioIndex + 1);
+        tft.setCursor(28, y + 19);
+        tft.setTextColor(ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL, SPECTRUM_CARD_BG);
+        tft.print(ok ? "CONNECTED" : "NOT DETECTED");
+    }
+    drawModernFooter("", "R REFRESH", "B BACK");
+    needRedraw = false;
+}
+
+void DisplayManager::renderProfilesScreen() {
+    drawModernHeader("SCAN PROFILES", SPECTRUM_ACCENT);
+    const char* names[4] = {"FAST", "BALANCED", "DEEP", "CUSTOM"};
+    const int samples[4] = {
+        12,
+        SPECTRUM_SAMPLES_PER_CH,
+        60,
+        appState.customSpectrumSamples
+    };
+    for (int profile = 0; profile < 4; profile++) {
+        const int y = 17 + profile * 21;
+        const bool selected = static_cast<int>(appState.scanProfile) == profile;
+        const uint16_t background = selected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
+        tft.fillRoundRect(8, y, 144, 18, 4, background);
+        tft.drawRoundRect(8, y, 144, 18, 4,
+                          selected ? SPECTRUM_ACCENT : SPECTRUM_BORDER);
+        tft.setCursor(15, y + 6);
+        tft.setTextColor(selected ? SPECTRUM_ACCENT : ST77XX_GRAY, background);
+        tft.print(names[profile]);
+        tft.setCursor(98, y + 6);
+        tft.setTextColor(ST77XX_WHITE, background);
+        tft.print(samples[profile]);
+        tft.print(" smp");
+    }
+    drawModernFooter("U/D SET", "R VALUE", "B BACK");
+    needRedraw = false;
 }
 
 // =============================================================================
@@ -939,8 +1184,26 @@ void DisplayManager::updateUI() {
         case APP_MODE_ANALYZER_SPECTRUM:
             renderSpectrumAnalyzer();
             break;
+        case APP_MODE_WATERFALL:
+            renderWaterfallScreen();
+            break;
         case APP_MODE_ANALYZER_CHANNEL:
             renderChannelInspector();   // per-frame dynamic update (static part redrawn internally)
+            break;
+        case APP_MODE_SURVEY:
+            renderSurveyScreen();
+            break;
+        case APP_MODE_EVENTS:
+            renderEventsScreen();
+            break;
+        case APP_MODE_LOGGING:
+            if (needRedraw) renderLoggingScreen();
+            break;
+        case APP_MODE_RADIO_DIAG:
+            if (needRedraw) renderRadioDiagScreen();
+            break;
+        case APP_MODE_PROFILES:
+            if (needRedraw) renderProfilesScreen();
             break;
         case APP_MODE_SETTINGS:
             if (needRedraw) {
@@ -978,30 +1241,55 @@ void DisplayManager::processInput() {
     // CONDITION 1: MAIN MENU
     // -------------------------------------------------------------------------
     if (appState.appMode == APP_MODE_MENU) {
-        if (buttonManager.isPressed(BTN_UP)) {
+        if (buttonManager.isLongPressed(BTN_UP) || buttonManager.isLongPressed(BTN_DOWN)) {
+            menuPage = (menuPage + 1) % NUM_MENU_PAGES;
+            needRedraw = true;
+            menuNeedsPartialRedraw = false;
+        } else if (buttonManager.isPressed(BTN_UP)) {
             prevMenuSelection = menuSelection;
-            menuSelection = (menuSelection - 1 + NUM_MENU_ITEMS) % NUM_MENU_ITEMS;
+            menuSelection = (menuSelection - 1 + MENU_ITEMS_PER_PAGE) % MENU_ITEMS_PER_PAGE;
             menuNeedsPartialRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
             prevMenuSelection = menuSelection;
-            menuSelection = (menuSelection + 1) % NUM_MENU_ITEMS;
+            menuSelection = (menuSelection + 1) % MENU_ITEMS_PER_PAGE;
             menuNeedsPartialRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            menuPage = (menuPage + 1) % NUM_MENU_PAGES;
+            needRedraw = true;
+            menuNeedsPartialRedraw = false;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
-            if (menuSelection == 0) {
-                appState.appMode = APP_MODE_JAMMER;
-            } else if (menuSelection == 1) {
+            const int feature = menuPage * MENU_ITEMS_PER_PAGE + menuSelection;
+            if (feature == 0) {
                 radioManager.stopAll();
                 appState.resetPeaks();
                 appState.appMode = APP_MODE_ANALYZER_SPECTRUM;
-            } else if (menuSelection == 2) {
+            } else if (feature == 1) {
+                radioManager.stopAll();
+                appState.appMode = APP_MODE_WATERFALL;
+            } else if (feature == 2) {
                 radioManager.stopAll();
                 appState.inspectedPeak = 0;
                 appState.appMode = APP_MODE_ANALYZER_CHANNEL;
-            } else if (menuSelection == 3) {
+            } else if (feature == 3) {
+                radioManager.stopAll();
+                appState.appMode = APP_MODE_SURVEY;
+            } else if (feature == 4) {
+                radioManager.stopAll();
+                appState.appMode = APP_MODE_EVENTS;
+            } else if (feature == 5) {
+                radioManager.stopAll();
+                appState.appMode = APP_MODE_LOGGING;
+            } else if (feature == 6) {
+                appState.appMode = APP_MODE_JAMMER;
+            } else if (feature == 7) {
+                appState.appMode = APP_MODE_RADIO_DIAG;
+            } else if (feature == 8) {
+                appState.appMode = APP_MODE_PROFILES;
+            } else if (feature == 9) {
                 appState.appMode = APP_MODE_SETTINGS;
-            } else if (menuSelection == 4) {
+            } else if (feature == 10) {
                 appState.appMode = APP_MODE_STATUS;
-            } else if (menuSelection == 5) {
+            } else if (feature == 11) {
                 // Power options always begin from a safe, radio-off state.
                 radioManager.stopAll();
                 appState.appMode = APP_MODE_POWER;
@@ -1053,6 +1341,81 @@ void DisplayManager::processInput() {
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
             radioManager.stopAll();
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_WATERFALL) {
+        if (buttonManager.isPressed(BTN_UP)) {
+            appState.cycleAnalyzerBand(1);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            appState.cycleAnalyzerRadioMode(1);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+            memset(appState.waterfall, 0, sizeof(appState.waterfall));
+            appState.waterfallHead = 0;
+            appState.waterfallCount = 0;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            radioManager.stopAll();
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_SURVEY) {
+        if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
+            appState.cycleAnalyzerBand(1);
+            appState.resetSurvey();
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+            appState.resetSurvey();
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            radioManager.stopAll();
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_EVENTS) {
+        if (buttonManager.isPressed(BTN_RIGHT)) {
+            appState.clearEvents();
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            radioManager.stopAll();
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_LOGGING) {
+        if (buttonManager.isPressed(BTN_RIGHT)) {
+            appState.loggingEnabled = !appState.loggingEnabled;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_RADIO_DIAG) {
+        if (buttonManager.isPressed(BTN_RIGHT)) {
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_PROFILES) {
+        if (buttonManager.isPressed(BTN_UP)) {
+            appState.cycleScanProfile(-1);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            appState.cycleScanProfile(1);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT) &&
+                   appState.scanProfile == SCAN_PROFILE_CUSTOM) {
+            appState.cycleCustomSampleCount();
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
             appState.appMode = APP_MODE_MENU;
             needRedraw = true;
         }

@@ -18,6 +18,7 @@ public:
 private:
     Adafruit_ST7735 tft;
     int menuSelection = 0;
+    int menuPage = 0;
     int settingsSelection = 0;
     int statusPage = 0;
     int powerSelection = 0;
@@ -66,7 +67,13 @@ private:
     void renderMainMenu();
     void renderJammerScreen();
     void renderSpectrumAnalyzer();
+    void renderWaterfallScreen();
     void renderChannelInspector();
+    void renderSurveyScreen();
+    void renderEventsScreen();
+    void renderLoggingScreen();
+    void renderRadioDiagScreen();
+    void renderProfilesScreen();
     void renderSettingsScreen();
     void renderStatusScreen();
     void renderPowerScreen();

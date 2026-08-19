@@ -218,6 +218,88 @@ const char* AppState::getAnalyzerRadioModeName() const {
     }
 }
 
+void AppState::cycleScanProfile(int direction) {
+    int current = static_cast<int>(scanProfile);
+    constexpr int total = 4;
+    current = (current + direction + total) % total;
+    scanProfile = static_cast<ScanProfile>(current);
+    resetPeaks();
+    saveSettings();
+}
+
+const char* AppState::getScanProfileName() const {
+    switch (scanProfile) {
+        case SCAN_PROFILE_FAST:     return "FAST";
+        case SCAN_PROFILE_DEEP:     return "DEEP";
+        case SCAN_PROFILE_CUSTOM:   return "CUSTOM";
+        case SCAN_PROFILE_BALANCED:
+        default:                    return "BALANCED";
+    }
+}
+
+int AppState::getSpectrumSampleCount() const {
+    switch (scanProfile) {
+        case SCAN_PROFILE_FAST: return 12;
+        case SCAN_PROFILE_DEEP: return 60;
+        case SCAN_PROFILE_CUSTOM: return customSpectrumSamples;
+        default:                return SPECTRUM_SAMPLES_PER_CH;
+    }
+}
+
+int AppState::getInspectSampleCount() const {
+    switch (scanProfile) {
+        case SCAN_PROFILE_FAST: return 50;
+        case SCAN_PROFILE_DEEP: return 200;
+        case SCAN_PROFILE_CUSTOM: return constrain(customSpectrumSamples * 2, 20, 200);
+        default:                return INSPECT_SAMPLES;
+    }
+}
+
+void AppState::cycleCustomSampleCount() {
+    customSpectrumSamples += 10;
+    if (customSpectrumSamples > 100) customSpectrumSamples = 10;
+    resetPeaks();
+    saveSettings();
+}
+
+void AppState::recordCompletedSweep() {
+    for (int ch = 0; ch < TOTAL_CHANNELS; ch++) {
+        waterfall[waterfallHead][ch] = spectrumLevels[ch];
+        occupancyTotal[ch] += spectrumLevels[ch];
+    }
+    waterfallHead = (waterfallHead + 1) % WATERFALL_ROWS;
+    if (waterfallCount < WATERFALL_ROWS) waterfallCount++;
+    surveySweeps++;
+
+    const unsigned long now = millis();
+    if (peakLevel >= 60 && now - lastEventMs >= 750) {
+        rfEvents[eventHead].timestampMs = now;
+        rfEvents[eventHead].channel = static_cast<uint8_t>(peakChannel);
+        rfEvents[eventHead].level = peakLevel;
+        eventHead = (eventHead + 1) % RF_EVENT_COUNT;
+        if (eventCount < RF_EVENT_COUNT) eventCount++;
+        lastEventMs = now;
+    }
+
+    if (loggingEnabled) {
+        Serial.printf("RFLOG,%lu,%lu,%d,%u,%s,%s\n", now,
+                      static_cast<unsigned long>(surveySweeps), peakChannel,
+                      peakLevel, getAnalyzerBandName(), getAnalyzerRadioModeName());
+    }
+}
+
+void AppState::resetSurvey() {
+    memset(occupancyTotal, 0, sizeof(occupancyTotal));
+    surveySweeps = 0;
+}
+
+void AppState::clearEvents() {
+    memset(rfEvents, 0, sizeof(rfEvents));
+    eventHead = 0;
+    eventCount = 0;
+    lastEventMs = 0;
+}
+
 void AppState::getAnalyzerChannelRange(int &minCh, int &maxCh) const {
     switch (analyzerBand) {
         case SCAN_BAND_WIFI:
@@ -269,6 +351,10 @@ void AppState::loadSettings() {
     powerLevel = (rf24_pa_dbm_e)prefs.getInt("power", DEFAULT_POWER);
     dwellTimeUs = prefs.getInt("dwell", JAMMER_DWELL_US);
     jammerTarget = (JammerTarget)prefs.getUChar("target", JAM_TARGET_WIFI);
+    uint8_t storedProfile = prefs.getUChar("profile", SCAN_PROFILE_BALANCED);
+    scanProfile = storedProfile <= SCAN_PROFILE_CUSTOM ?
+                  static_cast<ScanProfile>(storedProfile) : SCAN_PROFILE_BALANCED;
+    customSpectrumSamples = constrain(prefs.getInt("custom", 40), 10, 100);
     prefs.end();
     // Recompute jammer channel range & starting channel for the loaded target
     setJammerTarget(jammerTarget);
@@ -280,5 +366,7 @@ void AppState::saveSettings() {
     prefs.putInt("power", (int)powerLevel);
     prefs.putInt("dwell", dwellTimeUs);
     prefs.putUChar("target", (uint8_t)jammerTarget);
+    prefs.putUChar("profile", static_cast<uint8_t>(scanProfile));
+    prefs.putInt("custom", customSpectrumSamples);
     prefs.end();
 }

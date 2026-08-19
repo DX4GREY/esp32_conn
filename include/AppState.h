@@ -12,7 +12,13 @@ enum AppMode {
     APP_MODE_MENU,               // Main Menu
     APP_MODE_JAMMER,             // Fast Multi-Target Jammer Mode
     APP_MODE_ANALYZER_SPECTRUM,  // Radio Analyzer Mode: Live RF Spectrum Graph
+    APP_MODE_WATERFALL,          // Spectrum history
     APP_MODE_ANALYZER_CHANNEL,   // Radio Analyzer Mode: Deep Inspection of 1 Channel
+    APP_MODE_SURVEY,             // Accumulated channel occupancy
+    APP_MODE_EVENTS,             // Detected RF activity events
+    APP_MODE_LOGGING,            // Serial logging control
+    APP_MODE_RADIO_DIAG,         // Per-radio diagnostics
+    APP_MODE_PROFILES,           // Analyzer sampling profile
     APP_MODE_SETTINGS,           // RF Power & Dwell Time Settings
     APP_MODE_STATUS,             // Device Status Information
     APP_MODE_POWER,              // Restart / shutdown selection
@@ -42,6 +48,22 @@ enum AnalyzerRadioMode {
     ANALYZER_RADIO_2 = 3           // Radio 2 only
 };
 
+enum ScanProfile {
+    SCAN_PROFILE_FAST = 0,
+    SCAN_PROFILE_BALANCED = 1,
+    SCAN_PROFILE_DEEP = 2,
+    SCAN_PROFILE_CUSTOM = 3
+};
+
+constexpr int WATERFALL_ROWS = 24;
+constexpr int RF_EVENT_COUNT = 8;
+
+struct RfEvent {
+    unsigned long timestampMs = 0;
+    uint8_t channel = 0;
+    uint8_t level = 0;
+};
+
 // =============================================================================
 // STRUKTUR STATE GLOBAL
 // =============================================================================
@@ -65,12 +87,24 @@ struct AppState {
     // ----- ANALYZER STATE -----
     AnalyzerBand analyzerBand = SCAN_BAND_ALL;
     AnalyzerRadioMode analyzerRadioMode = ANALYZER_RADIO_FAST;
+    ScanProfile scanProfile = SCAN_PROFILE_BALANCED;
+    int customSpectrumSamples = 40;
     uint8_t spectrumLevels[TOTAL_CHANNELS];  // Current RF activity (0 - 100%)
     uint8_t peakLevels[TOTAL_CHANNELS];      // Peak Hold Value (0 - 100%)
     uint8_t radio1Levels[TOTAL_CHANNELS];    // Per-radio activity for diagnostics
     uint8_t radio2Levels[TOTAL_CHANNELS];
     int peakChannel = 0;                     // Channel with the highest RF
     uint8_t peakLevel = 0;                   // Current highest RF value (%)
+    uint8_t waterfall[WATERFALL_ROWS][TOTAL_CHANNELS];
+    uint8_t waterfallHead = 0;
+    uint8_t waterfallCount = 0;
+    uint32_t occupancyTotal[TOTAL_CHANNELS];
+    uint32_t surveySweeps = 0;
+    RfEvent rfEvents[RF_EVENT_COUNT];
+    uint8_t eventHead = 0;
+    uint8_t eventCount = 0;
+    unsigned long lastEventMs = 0;
+    bool loggingEnabled = false;
 
     // Single Channel Inspection
     int inspectedChannel = 36;               // Default Wi-Fi Ch 6
@@ -98,6 +132,14 @@ struct AppState {
     const char* getAnalyzerBandName() const;
     void cycleAnalyzerRadioMode(int direction = 1);
     const char* getAnalyzerRadioModeName() const;
+    void cycleScanProfile(int direction = 1);
+    const char* getScanProfileName() const;
+    int getSpectrumSampleCount() const;
+    int getInspectSampleCount() const;
+    void cycleCustomSampleCount();
+    void recordCompletedSweep();
+    void resetSurvey();
+    void clearEvents();
     void getAnalyzerChannelRange(int &minCh, int &maxCh) const;
         void resetPeaks();
     void decayPeaks();

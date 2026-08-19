@@ -48,3 +48,21 @@ bool ButtonManager::isPressed(int pin) {
     prevState[idx] = state;
     return pressed;
 }
+
+bool ButtonManager::isLongPressed(int pin, unsigned long holdMs) {
+    int idx = getPinIndex(pin);
+    if (idx < 0) return false;
+
+    const int state = readButton(pin);
+    if (state == LOW) {
+        if (holdStartTime[idx] == 0) holdStartTime[idx] = millis();
+        if (!holdReported[idx] && millis() - holdStartTime[idx] >= holdMs) {
+            holdReported[idx] = true;
+            return true;
+        }
+    } else {
+        holdStartTime[idx] = 0;
+        holdReported[idx] = false;
+    }
+    return false;
+}
