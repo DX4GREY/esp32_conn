@@ -2,6 +2,12 @@
 #include <Arduino.h>
 #include <RF24.h>
 
+// Analyzer-only is the safe default. The controlled-lab PlatformIO profile
+// explicitly sets this to 1 to compile active RF test functionality.
+#ifndef RF_LAB_TX_ENABLED
+#define RF_LAB_TX_ENABLED 0
+#endif
+
 // =============================================================================
 // HARDWARE PIN DEFINITIONS
 // =============================================================================

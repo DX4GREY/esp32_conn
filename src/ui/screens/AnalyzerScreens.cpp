@@ -1,6 +1,7 @@
 #include "ui/DisplayManager.h"
 #include "ui/DisplaySupport.h"
 #include "drivers/RadioManager.h"
+#include "services/SessionRecorder.h"
 
 using namespace DisplayUi;
 
@@ -40,28 +41,31 @@ void DisplayManager::drawSpectrumGrid() {
     tft.setCursor(9, GRAPH_Y_BASELINE - 5);
     tft.print("0");
 
-    // X-axis: Popular Wi-Fi Channel Markers (1, 6, 11, 14)
-    const int wifiMarkers[4] = {12, 37, 62, 84};
-    const char* wifiLabels[4] = {"1", "6", "11", "14"};
-
-    for (int i = 0; i < 4; i++) {
-        int markerX = GRAPH_X_START + wifiMarkers[i];
-        tft.drawFastVLine(markerX, GRAPH_Y_BASELINE + 1, 3, SPECTRUM_ACCENT);
-        tft.setCursor(markerX - 2, GRAPH_Y_BASELINE + 4);
-        tft.setTextColor(SPECTRUM_ACCENT, ST77XX_BLACK);
-        tft.print(wifiLabels[i]);
-    }
-
-    tft.setCursor(135, GRAPH_Y_BASELINE + 4);
+    int bandMin, bandMax;
+    appState.getAnalyzerChannelRange(bandMin, bandMax);
+    const int visibleCount = max(1, (bandMax - bandMin + 1) / appState.analyzerZoom);
+    const int center = constrain(appState.cursorChannel, bandMin, bandMax);
+    int visibleMin = constrain(center - visibleCount / 2, bandMin,
+                               max(bandMin, bandMax - visibleCount + 1));
+    const int visibleMax = min(bandMax, visibleMin + visibleCount - 1);
+    tft.fillRect(16, 82, 130, 22, ST77XX_BLACK);
+    tft.setCursor(17, 84);
+    tft.setTextColor(SPECTRUM_ACCENT, ST77XX_BLACK);
+    tft.print(2400 + visibleMin);
+    tft.setCursor(111, 84);
+    tft.print(2400 + visibleMax);
+    tft.setCursor(58, 84);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("GHz");
+    tft.print(appState.getAnalyzerTraceModeName());
+    tft.print(" x");
+    tft.print(appState.analyzerZoom);
 
     tft.fillRect(0, 105, 160, 23, ST77XX_BLACK);
     drawFooterChip(2, 37, "U BAND");
     String modeChip = "D ";
     modeChip += appState.getAnalyzerRadioModeName();
     drawFooterChip(41, 37, modeChip.c_str());
-    drawFooterChip(80, 37, "R RST");
+    drawFooterChip(80, 37, "R HOLD");
     drawFooterChip(119, 39, "B BACK");
 }
 
@@ -103,15 +107,25 @@ void DisplayManager::drawSpectrumBars() {
         previousHeaderRadio2Level = peakRadio2;
     }
 
+    int bandMin, bandMax;
+    appState.getAnalyzerChannelRange(bandMin, bandMax);
+    const int visibleCount = max(1, (bandMax - bandMin + 1) / appState.analyzerZoom);
+    const int center = constrain(appState.cursorChannel, bandMin, bandMax);
+    const int visibleMin = constrain(center - visibleCount / 2, bandMin,
+                                     max(bandMin, bandMax - visibleCount + 1));
+    const int visibleMax = min(bandMax, visibleMin + visibleCount - 1);
+    const int visibleSpan = max(1, visibleMax - visibleMin);
+
     tft.startWrite();
-    for (int ch = 0; ch < TOTAL_CHANNELS; ch++) {
-        uint8_t lvl = appState.spectrumLevels[ch];
+    for (int pixel = 0; pixel < GRAPH_WIDTH; pixel++) {
+        const int ch = visibleMin + (pixel * visibleSpan) / (GRAPH_WIDTH - 1);
+        uint8_t lvl = appState.getTraceLevel(ch);
         uint8_t peak = appState.peakLevels[ch];
-        if (previousSpectrumLevels[ch] == lvl && previousPeakLevels[ch] == peak) {
+        if (previousSpectrumLevels[pixel] == lvl && previousPeakLevels[pixel] == peak) {
             continue;
         }
 
-        int x = GRAPH_X_START + ch;
+        int x = GRAPH_X_START + pixel;
 
         int barHeight = (lvl * GRAPH_HEIGHT) / 100;
         int peakHeight = (peak * GRAPH_HEIGHT) / 100;
@@ -120,7 +134,7 @@ void DisplayManager::drawSpectrumBars() {
 
         // Clear only this dirty column and restore the card's dotted guides.
         tft.writeFastVLine(x, GRAPH_Y_TOP, GRAPH_HEIGHT + 1, SPECTRUM_CARD_BG);
-        if ((ch % 4) == 0) {
+        if ((pixel % 4) == 0) {
             tft.writePixel(x, GRAPH_Y_TOP, SPECTRUM_GRID);
             tft.writePixel(x, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2), SPECTRUM_GRID);
         }
@@ -157,10 +171,32 @@ void DisplayManager::drawSpectrumBars() {
             tft.writePixel(x, peakTop, ST77XX_WHITE);
         }
 
-        previousSpectrumLevels[ch] = lvl;
-        previousPeakLevels[ch] = peak;
+        if (appState.watchedChannels[ch]) {
+            tft.writePixel(x, GRAPH_Y_TOP + 1, SPECTRUM_ACCENT);
+        }
+        previousSpectrumLevels[pixel] = lvl;
+        previousPeakLevels[pixel] = peak;
     }
     tft.endWrite();
+
+    const int cursorX = GRAPH_X_START +
+        ((constrain(appState.cursorChannel, visibleMin, visibleMax) - visibleMin) *
+         (GRAPH_WIDTH - 1)) / visibleSpan;
+    tft.fillTriangle(cursorX - 2, GRAPH_Y_TOP, cursorX + 2, GRAPH_Y_TOP,
+                     cursorX, GRAPH_Y_TOP + 3, ST77XX_WHITE);
+
+    tft.fillRect(17, 95, 128, 8, ST77XX_BLACK);
+    tft.setCursor(18, 95);
+    tft.setTextColor(appState.analyzerFrozen ? SPECTRUM_HIGH : ST77XX_GRAY,
+                     ST77XX_BLACK);
+    tft.print(appState.analyzerFrozen ? "HOLD " : "C ");
+    tft.print(appState.cursorChannel);
+    tft.print("/");
+    tft.print(2400 + appState.cursorChannel);
+    tft.print(" ");
+    tft.print(appState.getTraceLevel(appState.cursorChannel));
+    tft.print(appState.watchedChannels[appState.cursorChannel] ? "%* Q" : "% Q");
+    tft.print(appState.analyzerConfidence);
 }
 
 void DisplayManager::renderSpectrumAnalyzer() {
@@ -268,14 +304,22 @@ void DisplayManager::renderEventsScreen() {
         drawModernHeader("RF EVENTS", SPECTRUM_HIGH);
         tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
         tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
-        drawModernFooter("", "R CLEAR", "B BACK");
+        drawModernFooter("U T/D H", "R CLEAR", "B BACK");
         needRedraw = false;
     }
 
     tft.fillRect(9, 20, 142, 79, SPECTRUM_CARD_BG);
     tft.setCursor(10, 21);
     tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("TRIGGER >=60%   COUNT ");
+    tft.print("T");
+    tft.print(appState.eventThreshold);
+    tft.print(" H");
+    tft.print(appState.eventHysteresis);
+    tft.print(" D");
+    tft.print(appState.eventMinSweeps);
+    tft.print(" M");
+    tft.print(appState.eventMinChannels);
+    tft.print(" #");
     tft.setTextColor(SPECTRUM_HIGH, SPECTRUM_CARD_BG);
     tft.print(appState.eventCount);
 
@@ -297,6 +341,12 @@ void DisplayManager::renderEventsScreen() {
         tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
         tft.print(ageSec);
         tft.print("s");
+        if (event.channelCount > 1) {
+            tft.setCursor(83, y);
+            tft.setTextColor(SPECTRUM_HIGH, SPECTRUM_CARD_BG);
+            tft.print("x");
+            tft.print(event.channelCount);
+        }
     }
 }
 
@@ -313,10 +363,17 @@ void DisplayManager::renderLoggingScreen() {
     tft.print(appState.loggingEnabled ? "RECORDING" : "STOPPED");
     tft.setCursor(34, 74);
     tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
-    tft.print("115200 BAUD CSV");
+    tft.print("USB + LITTLEFS CSV");
     tft.setCursor(32, 86);
     tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("1 summary / sweep");
+    if (sessionRecorder.isReady()) {
+        tft.print(sessionRecorder.recordedSweeps());
+        tft.print(" sweeps / ");
+        tft.print(sessionRecorder.fileSize() / 1024);
+        tft.print("K");
+    } else {
+        tft.print("STORAGE UNAVAILABLE");
+    }
     drawModernFooter("", "R TOGGLE", "B BACK");
     needRedraw = false;
 }

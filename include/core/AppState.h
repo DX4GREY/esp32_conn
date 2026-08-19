@@ -36,6 +36,10 @@ struct AppState {
     uint8_t peakLevels[TOTAL_CHANNELS];      // Peak Hold Value (0 - 100%)
     uint8_t radio1Levels[TOTAL_CHANNELS];    // Per-radio activity for diagnostics
     uint8_t radio2Levels[TOTAL_CHANNELS];
+    uint8_t averageLevels[TOTAL_CHANNELS];
+    uint8_t maxLevels[TOTAL_CHANNELS];
+    uint8_t baselineLevels[TOTAL_CHANNELS];
+    bool watchedChannels[TOTAL_CHANNELS];
     int peakChannel = 0;                     // Channel with the highest RF
     uint8_t peakLevel = 0;                   // Current highest RF value (%)
     uint8_t waterfall[WATERFALL_ROWS][TOTAL_CHANNELS];
@@ -48,6 +52,22 @@ struct AppState {
     uint8_t eventCount = 0;
     unsigned long lastEventMs = 0;
     bool loggingEnabled = false;
+    AnalyzerTraceMode analyzerTraceMode = ANALYZER_TRACE_LIVE;
+    bool analyzerFrozen = false;
+    bool baselineValid = false;
+    bool cursorFollowsPeak = true;
+    int cursorChannel = 36;
+    uint8_t analyzerZoom = 1;
+    uint8_t analyzerConfidence = 0;
+
+    // Event engine configuration. Percentages represent carrier-hit ratios,
+    // not calibrated RSSI or dBm.
+    uint8_t eventThreshold = 60;
+    uint8_t eventHysteresis = 10;
+    uint8_t eventMinSweeps = 2;
+    uint8_t eventMinChannels = 1;
+    uint8_t eventRunLength[TOTAL_CHANNELS];
+    bool eventLatched = false;
 
     // Single Channel Inspection
     int inspectedChannel = 36;               // Default Wi-Fi Ch 6
@@ -82,7 +102,17 @@ struct AppState {
     int getSpectrumSampleCount() const;
     int getInspectSampleCount() const;
     void cycleCustomSampleCount();
-    void recordCompletedSweep();
+    void cycleAnalyzerTraceMode(int direction = 1);
+    const char* getAnalyzerTraceModeName() const;
+    void cycleAnalyzerZoom();
+    void setCursorChannel(int channel, bool followPeak = false);
+    void toggleWatchChannel(int channel);
+    void captureBaseline();
+    void clearAnalyzerMax();
+    uint8_t getTraceLevel(int channel) const;
+    void configureEventEngine(uint8_t threshold, uint8_t hysteresis,
+                              uint8_t minSweeps, uint8_t minChannels);
+    void recordCompletedSweep(uint8_t receiverCount = 1);
     void resetSurvey();
     void clearEvents();
     void getAnalyzerChannelRange(int &minCh, int &maxCh) const;
@@ -92,6 +122,13 @@ struct AppState {
     // NVS Persistence
     void loadSettings();
     void saveSettings();
+    void markSettingsDirty();
+    void serviceSettingsPersistence();
+    void factoryResetSettings();
+
+private:
+    bool settingsDirty = false;
+    unsigned long settingsDirtySinceMs = 0;
 };
 
 extern AppState appState;

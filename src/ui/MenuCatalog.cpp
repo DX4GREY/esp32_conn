@@ -11,7 +11,11 @@ constexpr MenuFeature FEATURES[MenuCatalog::FEATURE_COUNT] = {
     {"SURVEY",    APP_MODE_SURVEY,             3, MENU_OPEN_STOP_RADIOS},
     {"EVENTS",    APP_MODE_EVENTS,             4, MENU_OPEN_STOP_RADIOS},
     {"LOGGING",   APP_MODE_LOGGING,            5, MENU_OPEN_STOP_RADIOS},
+#if RF_LAB_TX_ENABLED
     {"RF TEST",   APP_MODE_JAMMER,             6, MENU_OPEN_NONE},
+#else
+    {"RX ONLY",   APP_MODE_JAMMER,             6, MENU_OPEN_NONE},
+#endif
     {"RADIO DIAG",APP_MODE_RADIO_DIAG,         7, MENU_OPEN_NONE},
     {"PROFILES",  APP_MODE_PROFILES,           8, MENU_OPEN_NONE},
     {"SETTINGS",  APP_MODE_SETTINGS,           9, MENU_OPEN_NONE},

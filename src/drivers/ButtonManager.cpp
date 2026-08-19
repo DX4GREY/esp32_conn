@@ -66,3 +66,17 @@ bool ButtonManager::isLongPressed(int pin, unsigned long holdMs) {
     }
     return false;
 }
+
+bool ButtonManager::isShortReleased(int pin, unsigned long longPressMs) {
+    const int idx = getPinIndex(pin);
+    if (idx < 0) return false;
+    const int state = readButton(pin);
+    if (state == LOW) {
+        if (shortStartTime[idx] == 0) shortStartTime[idx] = millis();
+        return false;
+    }
+    if (shortStartTime[idx] == 0) return false;
+    const unsigned long duration = millis() - shortStartTime[idx];
+    shortStartTime[idx] = 0;
+    return duration < longPressMs;
+}

@@ -2,6 +2,7 @@
 #include "drivers/ButtonManager.h"
 #include "drivers/RadioManager.h"
 #include "ui/MenuCatalog.h"
+#include "services/SessionRecorder.h"
 
 void DisplayManager::updateUI() {
     const int currentMode = static_cast<int>(appState.appMode);
@@ -114,6 +115,9 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             const MenuFeature& feature =
                 MenuCatalog::featureAt(menuPage, menuSelection);
+            if (feature.mode != APP_MODE_ANALYZER_SPECTRUM) {
+                appState.analyzerFrozen = false;
+            }
             if (feature.openFlags & MENU_OPEN_STOP_RADIOS) {
                 radioManager.stopAll();
             }
@@ -160,17 +164,33 @@ void DisplayManager::processInput() {
     // CONDITION 3: SPECTRUM ANALYZER
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_ANALYZER_SPECTRUM) {
-        if (buttonManager.isPressed(BTN_UP)) {
-            appState.cycleAnalyzerBand(1);
+        if (buttonManager.isLongPressed(BTN_UP)) {
+            appState.cycleAnalyzerTraceMode(1);
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_DOWN)) {
-            appState.cycleAnalyzerRadioMode(1);
+        } else if (buttonManager.isLongPressed(BTN_DOWN)) {
+            appState.cycleAnalyzerZoom();
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
-            appState.resetPeaks();
+        } else if (buttonManager.isLongPressed(BTN_RIGHT)) {
+            appState.captureBaseline();
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_B)) {
+        } else if (buttonManager.isLongPressed(BTN_B)) {
+            appState.toggleWatchChannel(appState.cursorChannel);
+            needRedraw = true;
+        } else if (buttonManager.isShortReleased(BTN_UP)) {
+            if (appState.analyzerFrozen) appState.setCursorChannel(appState.cursorChannel + 1, false);
+            else appState.cycleAnalyzerBand(1);
+            needRedraw = true;
+        } else if (buttonManager.isShortReleased(BTN_DOWN)) {
+            if (appState.analyzerFrozen) appState.setCursorChannel(appState.cursorChannel - 1, false);
+            else appState.cycleAnalyzerRadioMode(1);
+            needRedraw = true;
+        } else if (buttonManager.isShortReleased(BTN_RIGHT)) {
+            appState.analyzerFrozen = !appState.analyzerFrozen;
+            if (!appState.analyzerFrozen) appState.cursorFollowsPeak = true;
+            needRedraw = true;
+        } else if (buttonManager.isShortReleased(BTN_B)) {
             radioManager.stopAll();
+            appState.analyzerFrozen = false;
             appState.appMode = APP_MODE_MENU;
             needRedraw = true;
         }
@@ -208,7 +228,27 @@ void DisplayManager::processInput() {
         }
     }
     else if (appState.appMode == APP_MODE_EVENTS) {
-        if (buttonManager.isPressed(BTN_RIGHT)) {
+        if (buttonManager.isLongPressed(BTN_UP)) {
+            const uint8_t duration = appState.eventMinSweeps >= 5 ? 1 : appState.eventMinSweeps + 1;
+            appState.configureEventEngine(appState.eventThreshold, appState.eventHysteresis,
+                                          duration, appState.eventMinChannels);
+            needRedraw = true;
+        } else if (buttonManager.isLongPressed(BTN_DOWN)) {
+            const uint8_t channels = appState.eventMinChannels >= 4 ? 1 : appState.eventMinChannels + 1;
+            appState.configureEventEngine(appState.eventThreshold, appState.eventHysteresis,
+                                          appState.eventMinSweeps, channels);
+            needRedraw = true;
+        } else if (buttonManager.isShortReleased(BTN_UP)) {
+            const uint8_t threshold = appState.eventThreshold >= 90 ? 30 : appState.eventThreshold + 5;
+            appState.configureEventEngine(threshold, appState.eventHysteresis,
+                                          appState.eventMinSweeps, appState.eventMinChannels);
+            needRedraw = true;
+        } else if (buttonManager.isShortReleased(BTN_DOWN)) {
+            const uint8_t hysteresis = appState.eventHysteresis >= 30 ? 0 : appState.eventHysteresis + 5;
+            appState.configureEventEngine(appState.eventThreshold, hysteresis,
+                                          appState.eventMinSweeps, appState.eventMinChannels);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
             appState.clearEvents();
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
@@ -219,7 +259,12 @@ void DisplayManager::processInput() {
     }
     else if (appState.appMode == APP_MODE_LOGGING) {
         if (buttonManager.isPressed(BTN_RIGHT)) {
-            appState.loggingEnabled = !appState.loggingEnabled;
+            if (appState.loggingEnabled) {
+                appState.loggingEnabled = false;
+                sessionRecorder.stop();
+            } else {
+                appState.loggingEnabled = sessionRecorder.start();
+            }
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
             appState.appMode = APP_MODE_MENU;
@@ -305,10 +350,10 @@ void DisplayManager::processInput() {
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_STATUS) {
         if (buttonManager.isPressed(BTN_UP)) {
-            statusPage = (statusPage + 2) % 3;
+            statusPage = (statusPage + 3) % 4;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
-            statusPage = (statusPage + 1) % 3;
+            statusPage = (statusPage + 1) % 4;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             lastStatusRenderMs = 0;

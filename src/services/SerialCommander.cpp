@@ -2,6 +2,8 @@
 #include "core/AppState.h"
 #include "drivers/RadioManager.h"
 #include "ui/DisplayManager.h"
+#include "services/SessionRecorder.h"
+#include "services/PerformanceMonitor.h"
 
 SerialCommander serialCommander;
 
@@ -43,6 +45,126 @@ void SerialCommander::executeCommand(String cmd) {
     else if (lowerCmd == "scan" || lowerCmd == "spectrum") {
         radioManager.stopJammer();
         printAsciiSpectrum();
+    }
+    else if (lowerCmd.startsWith("trace ")) {
+        const String value = lowerCmd.substring(6);
+        if (value == "live") appState.analyzerTraceMode = ANALYZER_TRACE_LIVE;
+        else if (value == "avg" || value == "average") appState.analyzerTraceMode = ANALYZER_TRACE_AVERAGE;
+        else if (value == "max") appState.analyzerTraceMode = ANALYZER_TRACE_MAX;
+        else if (value == "delta") appState.analyzerTraceMode = ANALYZER_TRACE_DELTA;
+        else { Serial.println("Trace options: live, avg, max, delta"); return; }
+        appState.markSettingsDirty();
+        Serial.println("Analyzer trace: " + String(appState.getAnalyzerTraceModeName()));
+    }
+    else if (lowerCmd == "freeze" || lowerCmd == "hold") {
+        appState.analyzerFrozen = true;
+        Serial.println("Analyzer frozen.");
+    }
+    else if (lowerCmd == "resume") {
+        appState.analyzerFrozen = false;
+        Serial.println("Analyzer resumed.");
+    }
+    else if (lowerCmd.startsWith("zoom ")) {
+        const int zoom = lowerCmd.substring(5).toInt();
+        if (zoom == 1 || zoom == 2 || zoom == 4) {
+            appState.analyzerZoom = zoom;
+            Serial.printf("Analyzer zoom: %dx\n", zoom);
+        } else Serial.println("Zoom options: 1, 2, 4");
+    }
+    else if (lowerCmd.startsWith("cursor ")) {
+        appState.setCursorChannel(lowerCmd.substring(7).toInt(), false);
+        Serial.printf("Cursor: CH%d / %d MHz\n", appState.cursorChannel,
+                      2400 + appState.cursorChannel);
+    }
+    else if (lowerCmd.startsWith("watch ")) {
+        const int channel = constrain(lowerCmd.substring(6).toInt(), MIN_CHANNEL, MAX_CHANNEL);
+        appState.toggleWatchChannel(channel);
+        Serial.printf("Watch CH%d: %s\n", channel,
+                      appState.watchedChannels[channel] ? "ON" : "OFF");
+    }
+    else if (lowerCmd == "baseline") {
+        appState.captureBaseline();
+        Serial.println("Baseline captured; DELTA trace selected.");
+    }
+    else if (lowerCmd == "max clear") {
+        appState.clearAnalyzerMax();
+        Serial.println("Analyzer maximum history cleared.");
+    }
+    else if (lowerCmd.startsWith("event ")) {
+        String args = lowerCmd.substring(6);
+        const int split = args.indexOf(' ');
+        if (split < 0) {
+            Serial.println("event <threshold|hysteresis|duration|channels> <value>");
+        } else {
+            const String key = args.substring(0, split);
+            const int value = args.substring(split + 1).toInt();
+            uint8_t threshold = appState.eventThreshold;
+            uint8_t hysteresis = appState.eventHysteresis;
+            uint8_t duration = appState.eventMinSweeps;
+            uint8_t channels = appState.eventMinChannels;
+            if (key == "threshold") threshold = value;
+            else if (key == "hysteresis") hysteresis = value;
+            else if (key == "duration") duration = value;
+            else if (key == "channels") channels = value;
+            else { Serial.println("Unknown event setting."); return; }
+            appState.configureEventEngine(threshold, hysteresis, duration, channels);
+            Serial.printf("Event engine: threshold=%u hysteresis=%u duration=%u channels=%u\n",
+                          appState.eventThreshold, appState.eventHysteresis,
+                          appState.eventMinSweeps, appState.eventMinChannels);
+        }
+    }
+    else if (lowerCmd.startsWith("session")) {
+        String action = lowerCmd.length() > 7 ? lowerCmd.substring(7) : "info";
+        action.trim();
+        if (action == "start") {
+            appState.loggingEnabled = sessionRecorder.start();
+            Serial.println(appState.loggingEnabled ? "Session recording started." :
+                           "Session start failed: " + String(sessionRecorder.lastError()));
+        } else if (action == "stop") {
+            appState.loggingEnabled = false;
+            sessionRecorder.stop();
+            Serial.println("Session recording stopped.");
+        } else if (action == "export") {
+            Serial.println("--- RF SESSION CSV BEGIN ---");
+            if (!sessionRecorder.exportCsv(Serial)) Serial.println("No session available.");
+            Serial.println("--- RF SESSION CSV END ---");
+        } else if (action == "replay") {
+            radioManager.stopAll();
+            appState.loggingEnabled = false;
+            sessionRecorder.stop();
+            if (sessionRecorder.replayLatest(appState)) {
+                appState.appMode = APP_MODE_ANALYZER_SPECTRUM;
+                Serial.println("Last recorded sweep loaded and frozen.");
+            } else Serial.println("No replayable session available.");
+        } else {
+            Serial.printf("Session: %s, %lu sweeps, %u bytes, error=%s\n",
+                          sessionRecorder.isRecording() ? "RECORDING" : "STOPPED",
+                          static_cast<unsigned long>(sessionRecorder.recordedSweeps()),
+                          static_cast<unsigned>(sessionRecorder.fileSize()),
+                          sessionRecorder.lastError());
+        }
+    }
+    else if (lowerCmd == "perf") {
+        const PerformanceSnapshot perf = performanceMonitor.snapshot();
+        Serial.printf("PERF sweep last/avg/max=%lu/%lu/%lu us, UI avg/max=%lu/%lu us, loop=%u Hz\n",
+                      static_cast<unsigned long>(perf.lastSweepUs),
+                      static_cast<unsigned long>(perf.averageSweepUs),
+                      static_cast<unsigned long>(perf.maxSweepUs),
+                      static_cast<unsigned long>(perf.averageUiUs),
+                      static_cast<unsigned long>(perf.maxUiUs), perf.loopsPerSecond);
+        Serial.printf("SPI lock contention=%lu timeout=%lu avg/max wait=%lu/%lu us\n",
+                      static_cast<unsigned long>(radioManager.getBusContentions()),
+                      static_cast<unsigned long>(radioManager.getBusTimeouts()),
+                      static_cast<unsigned long>(radioManager.getAverageBusWaitUs()),
+                      static_cast<unsigned long>(radioManager.getMaxBusWaitUs()));
+    }
+    else if (lowerCmd == "factory reset confirm") {
+        radioManager.stopAll();
+        sessionRecorder.stop();
+        appState.factoryResetSettings();
+        Serial.println("Factory settings restored. Rebooting...");
+        delay(100);
+        ESP.restart();
     }
     else if (lowerCmd.startsWith("inspect ")) {
         int ch = lowerCmd.substring(8).toInt();
@@ -137,6 +259,12 @@ void SerialCommander::printConfig() {
     Serial.println("TX Power Level : " + String(appState.getPowerLevelName()) + " [" + String(appState.getPowerLevelDbmStr()) + "]");
     Serial.println("Dwell Time     : " + String(appState.dwellTimeUs) + " µs (" + String(appState.getDwellTimeName()) + ")");
     Serial.println("Display Theme  : " + String(appState.getDisplayThemeName()));
+    Serial.println("Analyzer Trace : " + String(appState.getAnalyzerTraceModeName()));
+    Serial.printf("Event Engine   : T%u H%u D%u M%u\n", appState.eventThreshold,
+                  appState.eventHysteresis, appState.eventMinSweeps,
+                  appState.eventMinChannels);
+    Serial.println("Build Profile  : " + String(radioManager.transmitFeaturesEnabled() ?
+                                                "AUTHORIZED_RF_LAB" : "ANALYZER_ONLY"));
     Serial.println("Active Target  : " + String(appState.getJammerTargetName()) + " (" + String(appState.getJammerFreqRangeStr()) + ")");
     Serial.println("Radio PA Mode  : LNA Gain MAX Enabled");
     Serial.println("Data Rate      : 2 Mbps (RF24_2MBPS)");
@@ -148,13 +276,15 @@ void SerialCommander::printConfig() {
 
 void SerialCommander::printStatus() {
     Serial.println("\n=== DEVICE & RADIO STATUS ===");
-    Serial.println("nRF24L01+ : " + String(radioManager.isConnected() ? "✅ CONNECTED" : "❌ NOT DETECTED"));
+    Serial.printf("nRF24L01+ : %u/2 receiver(s) available\n", radioManager.availableRadioCount());
     Serial.println("Jam Mode  : " + String(appState.jamming ? "🔥 ACTIVE (Core 0 Task)" : "🛑 STOPPED"));
     Serial.println("Target    : " + String(appState.getJammerTargetName()));
     Serial.println("Range     : " + String(appState.getJammerFreqRangeStr()));
     Serial.println("TX Power  : " + String(appState.getPowerLevelName()) + " (" + String(appState.getPowerLevelDbmStr()) + ")");
     Serial.println("Dwell Time: " + String(appState.dwellTimeUs) + " µs (" + String(appState.getDwellTimeName()) + ")");
     Serial.println("Peak RF   : Channel " + String(appState.peakChannel) + " (" + String(appState.peakLevel) + "%)");
+    Serial.printf("Confidence: %u%% (%s)\n", appState.analyzerConfidence,
+                  appState.analyzerFrozen ? "FROZEN" : "LIVE");
     Serial.println("=== END STATUS ===\n");
 }
 
@@ -168,6 +298,17 @@ void SerialCommander::printHelp() {
     Serial.println("stop         - Stop jammer transmission");
     Serial.println("scan         - Run Spectrum Analyzer and print RF graph");
     Serial.println("inspect <ch> - Analyze RF activity on a specific channel");
+    Serial.println("trace <mode>  - live, avg, max, or delta");
+    Serial.println("freeze/resume - Hold or resume analyzer acquisition");
+    Serial.println("zoom <1|2|4>  - Set graph zoom around cursor");
+    Serial.println("cursor <ch>   - Move analyzer cursor");
+    Serial.println("watch <ch>    - Toggle persistent channel watch marker");
+    Serial.println("baseline      - Capture baseline and select delta trace");
+    Serial.println("max clear     - Clear maximum history");
+    Serial.println("event <key> <value> - threshold/hysteresis/duration/channels");
+    Serial.println("session <start|stop|info|export|replay> - LittleFS recorder");
+    Serial.println("perf          - Runtime scan/UI/SPI timing diagnostics");
+    Serial.println("factory reset confirm - Restore persistent defaults and reboot");
     Serial.println("status       - Show system status and radio module");
     Serial.println("help         - Show this help");
     Serial.println("==============================\n");

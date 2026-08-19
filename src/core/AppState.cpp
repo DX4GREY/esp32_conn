@@ -37,7 +37,7 @@ void AppState::setJammerTarget(JammerTarget target) {
             break;
     }
     currentJamChannel2 = currentJamChannel;
-    saveSettings();
+    markSettingsDirty();
 }
 
 bool AppState::setJammerTargetByName(const String& name) {
@@ -103,7 +103,7 @@ void AppState::cyclePowerLevel(int direction) {
     // RF24 PA levels: RF24_PA_MIN(0), RF24_PA_LOW(1), RF24_PA_HIGH(2), RF24_PA_MAX(3)
         cur = (cur + direction + 4) % 4;
     powerLevel = (rf24_pa_dbm_e)cur;
-    saveSettings();
+    markSettingsDirty();
 }
 
 bool AppState::setPowerLevelByName(const String& name) {
@@ -113,19 +113,19 @@ bool AppState::setPowerLevelByName(const String& name) {
 
         if (n == "min" || n == "-18" || n == "-18dbm") {
         powerLevel = RF24_PA_MIN;
-        saveSettings();
+        markSettingsDirty();
         return true;
     } else if (n == "low" || n == "-12" || n == "-12dbm") {
         powerLevel = RF24_PA_LOW;
-        saveSettings();
+        markSettingsDirty();
         return true;
     } else if (n == "high" || n == "-6" || n == "-6dbm") {
         powerLevel = RF24_PA_HIGH;
-        saveSettings();
+        markSettingsDirty();
         return true;
     } else if (n == "max" || n == "0" || n == "0dbm" || n == "full") {
         powerLevel = RF24_PA_MAX;
-        saveSettings();
+        markSettingsDirty();
         return true;
     }
     return false;
@@ -161,13 +161,13 @@ void AppState::cycleDwellTime(int direction) {
     }
         idx = (idx + direction + DWELL_PRESETS_COUNT) % DWELL_PRESETS_COUNT;
     dwellTimeUs = DWELL_PRESETS[idx];
-    saveSettings();
+    markSettingsDirty();
 }
 
 bool AppState::setDwellTime(int us) {
         if (us >= 10 && us <= 10000) {
         dwellTimeUs = us;
-        saveSettings();
+        markSettingsDirty();
         return true;
     }
     return false;
@@ -189,7 +189,7 @@ void AppState::cycleDisplayTheme(int direction) {
     int current = static_cast<int>(displayTheme);
     current = (current + direction + DISPLAY_THEME_COUNT) % DISPLAY_THEME_COUNT;
     displayTheme = static_cast<DisplayThemeId>(current);
-    saveSettings();
+    markSettingsDirty();
 }
 
 const char* AppState::getDisplayThemeName() const {

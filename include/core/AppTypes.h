@@ -52,6 +52,14 @@ enum ScanProfile {
     SCAN_PROFILE_CUSTOM
 };
 
+enum AnalyzerTraceMode {
+    ANALYZER_TRACE_LIVE = 0,
+    ANALYZER_TRACE_AVERAGE,
+    ANALYZER_TRACE_MAX,
+    ANALYZER_TRACE_DELTA,
+    ANALYZER_TRACE_COUNT
+};
+
 enum DisplayThemeId {
     DISPLAY_THEME_CYBER = 0,
     DISPLAY_THEME_OCEAN,
@@ -69,4 +77,6 @@ struct RfEvent {
     unsigned long timestampMs = 0;
     uint8_t channel = 0;
     uint8_t level = 0;
+    uint8_t channelCount = 0;
+    uint8_t durationSweeps = 0;
 };

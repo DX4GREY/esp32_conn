@@ -1,6 +1,41 @@
 #include "drivers/RadioManager.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 RadioManager radioManager;
+
+namespace {
+SemaphoreHandle_t radioBusMutex = nullptr;
+portMUX_TYPE radioStatsMux = portMUX_INITIALIZER_UNLOCKED;
+uint32_t busContentions = 0;
+uint32_t busTimeouts = 0;
+uint64_t busWaitTotalUs = 0;
+uint32_t busLockCount = 0;
+uint32_t busMaxWaitUs = 0;
+
+bool lockRadioBus(TickType_t timeout = pdMS_TO_TICKS(100)) {
+    if (radioBusMutex == nullptr) return false;
+    const uint32_t started = micros();
+    bool contended = xSemaphoreTake(radioBusMutex, 0) != pdTRUE;
+    bool acquired = !contended;
+    if (!acquired) acquired = xSemaphoreTake(radioBusMutex, timeout) == pdTRUE;
+    const uint32_t waited = micros() - started;
+    portENTER_CRITICAL(&radioStatsMux);
+    if (contended) busContentions++;
+    if (!acquired) busTimeouts++;
+    if (acquired) {
+        busLockCount++;
+        busWaitTotalUs += waited;
+        if (waited > busMaxWaitUs) busMaxWaitUs = waited;
+    }
+    portEXIT_CRITICAL(&radioStatsMux);
+    return acquired;
+}
+
+void unlockRadioBus() {
+    if (radioBusMutex != nullptr) xSemaphoreGive(radioBusMutex);
+}
+}
 
 // =============================================================================
 // FILE-LOCAL: FAST TX CONFIG for a single nRF24L01+ (packet-storm mode)
@@ -37,9 +72,12 @@ void armContinuousJam(RF24 &r) {
 
 // One aggressive hop: retune + re-assert reuse + dwell at 100% duty.
 inline void hopAndReuse(RF24 &r, uint8_t ch, volatile int &activeChannel) {
-    r.setChannel(ch);
-    activeChannel = ch;
-    r.reUseTX();
+    if (lockRadioBus(pdMS_TO_TICKS(20))) {
+        r.setChannel(ch);
+        activeChannel = ch;
+        r.reUseTX();
+        unlockRadioBus();
+    }
     delayMicroseconds(appState.dwellTimeUs);
 }
 
@@ -53,6 +91,13 @@ void hopSplit(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
         if (i < count && !stop) {
             hopAndReuse(rB, channels[i], appState.currentJamChannel2);
         }
+    }
+}
+
+void hopSingle(RF24 &r, const uint8_t *channels, int count,
+               volatile int &activeChannel, const volatile bool &stop) {
+    for (int i = 0; i < count && !stop; i++) {
+        hopAndReuse(r, channels[i], activeChannel);
     }
 }
 
@@ -100,11 +145,30 @@ void hopZigbee(RF24 &rA, RF24 &rB, const volatile bool &stop) {
     }
 }
 
+void hopZigbeeSingle(RF24 &r, volatile int &activeChannel,
+                     const volatile bool &stop) {
+    for (int channel = 11; channel < 27 && !stop; channel++) {
+        const int startCh = 4 + 5 * (channel - 11);
+        const int endCh = min(MAX_CHANNEL, (5 + 5 * (channel - 11)) + 2);
+        for (int ch = startCh; ch <= endCh && !stop; ch++) {
+            hopAndReuse(r, ch, activeChannel);
+        }
+    }
+}
+
 } // namespace
 
 RadioManager::RadioManager() : radio(CE_PIN, CSN_PIN), radio2(CE_PIN_2, CSN_PIN_2) {}
 
+bool RadioManager::lockBus(TickType_t timeout) { return lockRadioBus(timeout); }
+void RadioManager::unlockBus() { unlockRadioBus(); }
+
 bool RadioManager::init() {
+    if (radioBusMutex == nullptr) radioBusMutex = xSemaphoreCreateMutex();
+    if (radioBusMutex == nullptr) {
+        Serial.println("FATAL: unable to allocate radio SPI mutex");
+        return false;
+    }
     // Ensure both radios start de-asserted. If a module was left in TX (e.g.
     // after a brownout reset during MAX-AGGRESSION jamming), CE HIGH holds it
     // transmitting and can stall the next begin(). Pull CE LOW first.
@@ -127,32 +191,43 @@ bool RadioManager::init() {
         delay(50); // let the 3.3V rail fully rise / module settle
 
         // Initialize both nRF24L01+ modules (different CSN/CE, same SPI bus)
-        okA = radio.begin(&SPI);
-        okB = radio2.begin(&SPI);
-        if (okA && okB) {
-            applyTxConfig();
-            Serial.println("nRF24L01+ Dual Radio Ready!");
-            Serial.println("   Use the display menu or type 'help' in Serial.\n");
-            return true;
-        }
+        if (!okA) okA = radio.begin(&SPI);
+        if (!okB) okB = radio2.begin(&SPI);
+        if (okA && okB) break;
 
         Serial.printf("[init] attempt %d/%d: radio1=%s radio2=%s\n",
                       attempt, MAX_ATTEMPTS,
                       okA ? "OK" : "FAIL", okB ? "OK" : "FAIL");
 
         // Clean up before retrying (begin() may have left the module powered up).
-        radio.powerDown();
-        radio2.powerDown();
+        if (okA) radio.powerDown();
+        if (okB) radio2.powerDown();
     }
 
-    Serial.println("FATAL: nRF24L01+ not detected after 5 attempts!");
+    if (okA || okB) {
+        radio1Available = okA;
+        radio2Available = okB;
+        if (transmitFeaturesEnabled()) applyTxConfig();
+        else enterRxMode();
+        Serial.printf("nRF24 ready: R1=%s R2=%s (%u active)\n",
+                      okA ? "OK" : "OFFLINE", okB ? "OK" : "OFFLINE",
+                      availableRadioCount());
+        Serial.println("   Use the display menu or type 'help' in Serial.\n");
+        return true;
+    }
+
+    radio1Available = false;
+    radio2Available = false;
+    Serial.println("FATAL: no nRF24L01+ detected after 5 attempts!");
     Serial.println("   Check wiring, 3.3V supply and decoupling caps.\n");
     return false;
 }
 
 void RadioManager::applyTxConfig() {
-    applyFastTxConfig(radio);
-    applyFastTxConfig(radio2);
+    if (!lockRadioBus()) return;
+    if (radio1Available) applyFastTxConfig(radio);
+    if (radio2Available) applyFastTxConfig(radio2);
+    unlockRadioBus();
     rxModeActive = false;
 }
 
@@ -161,37 +236,57 @@ void RadioManager::applyTxConfig() {
 // draining on-air. WITHOUT CE HIGH, writeFast() would just stuff the 3-slot
 // FIFO and then block forever waiting for a free slot.
 void RadioManager::enterTxMode() {
+#if !RF_LAB_TX_ENABLED
+    Serial.println("RF Test is disabled in the ANALYZER_ONLY build.");
+    return;
+#else
     applyTxConfig();      // stopListening + all TX patches on both radios
-    radio.powerUp();
-    radio2.powerUp();
-    radio.ce(HIGH);
-    radio2.ce(HIGH);
+    if (!lockRadioBus()) return;
+    if (radio1Available) { radio.powerUp(); radio.ce(HIGH); }
+    if (radio2Available) { radio2.powerUp(); radio2.ce(HIGH); }
+    unlockRadioBus();
+#endif
 }
 
 void RadioManager::enterRxMode() {
+    if (!hasAnyRadio() || !lockRadioBus()) return;
     // Fresh RX state on both radios (no unresolved carrier/fifo leftovers)
-    radio.stopConstCarrier();
-    radio.flush_tx();
-    radio.flush_rx();
-    radio.setAutoAck(false);
-    radio.setPALevel(RF24_PA_MAX, true);
-    radio.setDataRate(RF24_2MBPS);
-    radio.setCRCLength(RF24_CRC_DISABLED);
-    radio.startListening();
+    if (radio1Available) {
+        radio.stopConstCarrier();
+        radio.flush_tx();
+        radio.flush_rx();
+        radio.setAutoAck(false);
+        radio.setPALevel(RF24_PA_MAX, true);
+        radio.setDataRate(RF24_2MBPS);
+        radio.setCRCLength(RF24_CRC_DISABLED);
+        radio.startListening();
+    }
 
-    radio2.stopConstCarrier();
-    radio2.flush_tx();
-    radio2.flush_rx();
-    radio2.setAutoAck(false);
-    radio2.setPALevel(RF24_PA_MAX, true);
-    radio2.setDataRate(RF24_2MBPS);
-    radio2.setCRCLength(RF24_CRC_DISABLED);
-    radio2.startListening();
+    if (radio2Available) {
+        radio2.stopConstCarrier();
+        radio2.flush_tx();
+        radio2.flush_rx();
+        radio2.setAutoAck(false);
+        radio2.setPALevel(RF24_PA_MAX, true);
+        radio2.setDataRate(RF24_2MBPS);
+        radio2.setCRCLength(RF24_CRC_DISABLED);
+        radio2.startListening();
+    }
+    unlockRadioBus();
 
     rxModeActive = true;
 }
 
 void RadioManager::startJammer(JammerTarget target) {
+#if !RF_LAB_TX_ENABLED
+    (void)target;
+    Serial.println("RF Test unavailable: build AUTHORIZED_RF_LAB to enable it.");
+    return;
+#else
+    if (!hasAnyRadio()) {
+        Serial.println("RF Test unavailable: no radio detected.");
+        return;
+    }
     // If the task is already sweeping, just hot-swap the target
     // (the running loop re-reads appState.jammerTarget each round).
     if (appState.jamming && jammerTaskHandle != NULL) {
@@ -207,8 +302,10 @@ void RadioManager::startJammer(JammerTarget target) {
 
     // Max-aggression arming: both radios enter continuous REUSE_TX_PL mode and
     // stream at 100% airtime; the task loop only hops channels afterwards.
-    armContinuousJam(radio);
-    armContinuousJam(radio2);
+    if (!lockRadioBus()) return;
+    if (radio1Available) armContinuousJam(radio);
+    if (radio2Available) armContinuousJam(radio2);
+    unlockRadioBus();
 
     appState.jamming = true;
 
@@ -225,6 +322,7 @@ void RadioManager::startJammer(JammerTarget target) {
 
     Serial.println("JAMMER ACTIVE (Core 0 Background Task): " + String(appState.getJammerTargetName()));
     Serial.println("   Range: " + String(appState.getJammerFreqRangeStr()) + "\n");
+#endif
 }
 
 void RadioManager::stopJammer() {
@@ -244,39 +342,81 @@ void RadioManager::stopJammer() {
     }
 
     // Now stop both radios cleanly and drop any residual FIFO payloads
-    radio.ce(LOW);
-    radio.flush_tx();
-    radio.powerDown();
-    radio2.ce(LOW);
-    radio2.flush_tx();
-    radio2.powerDown();
+    if (lockRadioBus()) {
+        if (radio1Available) { radio.ce(LOW); radio.flush_tx(); radio.powerDown(); }
+        if (radio2Available) { radio2.ce(LOW); radio2.flush_tx(); radio2.powerDown(); }
+        unlockRadioBus();
+    }
     appState.jamming = false;
     Serial.println("Jammer Stopped.");
 }
 
 void RadioManager::stopAll() {
     stopJammer();
-    radio.stopListening();
-    radio2.stopListening();
+    if (lockRadioBus()) {
+        if (radio1Available) radio.stopListening();
+        if (radio2Available) radio2.stopListening();
+        unlockRadioBus();
+    }
     rxModeActive = false;
 }
 
 void RadioManager::updatePALevel(rf24_pa_dbm_e pwr) {
     appState.powerLevel = pwr;
-    radio.setPALevel(pwr, true);
-    radio2.setPALevel(pwr, true);
+    if (!lockRadioBus()) return;
+    if (radio1Available) radio.setPALevel(pwr, true);
+    if (radio2Available) radio2.setPALevel(pwr, true);
+    unlockRadioBus();
 }
 
 bool RadioManager::isConnected() {
-    return isRadio1Connected() && isRadio2Connected();
+    return hasAnyRadio();
 }
 
 bool RadioManager::isRadio1Connected() {
-    return radio.isChipConnected();
+    if (!radio1Available) return false;
+    if (!lockRadioBus(pdMS_TO_TICKS(20))) return radio1Available;
+    const bool connected = radio.isChipConnected();
+    unlockRadioBus();
+    return connected;
 }
 
 bool RadioManager::isRadio2Connected() {
-    return radio2.isChipConnected();
+    if (!radio2Available) return false;
+    if (!lockRadioBus(pdMS_TO_TICKS(20))) return radio2Available;
+    const bool connected = radio2.isChipConnected();
+    unlockRadioBus();
+    return connected;
+}
+
+bool RadioManager::hasAnyRadio() const { return radio1Available || radio2Available; }
+uint8_t RadioManager::availableRadioCount() const {
+    return static_cast<uint8_t>(radio1Available) + static_cast<uint8_t>(radio2Available);
+}
+uint32_t RadioManager::getBusContentions() const {
+    portENTER_CRITICAL(&radioStatsMux);
+    const uint32_t value = busContentions;
+    portEXIT_CRITICAL(&radioStatsMux);
+    return value;
+}
+uint32_t RadioManager::getBusTimeouts() const {
+    portENTER_CRITICAL(&radioStatsMux);
+    const uint32_t value = busTimeouts;
+    portEXIT_CRITICAL(&radioStatsMux);
+    return value;
+}
+uint32_t RadioManager::getMaxBusWaitUs() const {
+    portENTER_CRITICAL(&radioStatsMux);
+    const uint32_t value = busMaxWaitUs;
+    portEXIT_CRITICAL(&radioStatsMux);
+    return value;
+}
+uint32_t RadioManager::getAverageBusWaitUs() const {
+    portENTER_CRITICAL(&radioStatsMux);
+    const uint32_t value = busLockCount == 0 ? 0 :
+        static_cast<uint32_t>(busWaitTotalUs / busLockCount);
+    portEXIT_CRITICAL(&radioStatsMux);
+    return value;
 }
 
 // =============================================================================
@@ -292,6 +432,11 @@ void RadioManager::jammerTaskCode(void *param) {
     vTaskPrioritySet(NULL, 3);
 
     const volatile bool &stop = self->stopJam;
+    const bool dual = self->radio1Available && self->radio2Available;
+    RF24 &singleRadio = self->radio1Available ? self->radio : self->radio2;
+    volatile int &singleChannel = self->radio1Available ?
+                                  appState.currentJamChannel :
+                                  appState.currentJamChannel2;
 
     while (!stop) {
         switch (appState.jammerTarget) {
@@ -300,8 +445,10 @@ void RadioManager::jammerTaskCode(void *param) {
             //    Both radios hammer DIFFERENT halves simultaneously.
             // -----------------------------------------------------------------
             case JAM_TARGET_WIFI:
-                hopSplit(self->radio, self->radio2, wifi_channels,
-                         WIFI_CHANNELS_COUNT, stop);
+                if (dual) hopSplit(self->radio, self->radio2, wifi_channels,
+                                   WIFI_CHANNELS_COUNT, stop);
+                else hopSingle(singleRadio, wifi_channels, WIFI_CHANNELS_COUNT,
+                               singleChannel, stop);
                 break;
 
             // -----------------------------------------------------------------
@@ -310,9 +457,11 @@ void RadioManager::jammerTaskCode(void *param) {
             //    so both transceivers radiate at the same time.
             // -----------------------------------------------------------------
             case JAM_TARGET_BT:
-                hopPaired(self->radio, bluetooth_even_channels,
-                          self->radio2, bluetooth_odd_channels,
-                          BLUETOOTH_EVEN_CHANNELS_COUNT, stop);
+                if (dual) hopPaired(self->radio, bluetooth_even_channels,
+                                    self->radio2, bluetooth_odd_channels,
+                                    BLUETOOTH_EVEN_CHANNELS_COUNT, stop);
+                else hopSingle(singleRadio, bluetooth_even_channels,
+                               BLUETOOTH_EVEN_CHANNELS_COUNT, singleChannel, stop);
                 break;
 
             // -----------------------------------------------------------------
@@ -321,8 +470,10 @@ void RadioManager::jammerTaskCode(void *param) {
             //    on the critical advertising frequencies.
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_ADV:
-                hopDuo(self->radio, self->radio2, ble_channels,
-                       BLE_CHANNELS_COUNT, stop);
+                if (dual) hopDuo(self->radio, self->radio2, ble_channels,
+                                 BLE_CHANNELS_COUNT, stop);
+                else hopSingle(singleRadio, ble_channels, BLE_CHANNELS_COUNT,
+                               singleChannel, stop);
                 break;
 
             // -----------------------------------------------------------------
@@ -330,8 +481,10 @@ void RadioManager::jammerTaskCode(void *param) {
             //    Split hop across both radios for 2x coverage.
             // -----------------------------------------------------------------
             case JAM_TARGET_BLE_DATA:
-                hopSplit(self->radio, self->radio2, BLE_DATA_CHANNELS,
-                         BLE_DATA_CHANNELS_COUNT, stop);
+                if (dual) hopSplit(self->radio, self->radio2, BLE_DATA_CHANNELS,
+                                   BLE_DATA_CHANNELS_COUNT, stop);
+                else hopSingle(singleRadio, BLE_DATA_CHANNELS,
+                               BLE_DATA_CHANNELS_COUNT, singleChannel, stop);
                 break;
 
             // -----------------------------------------------------------------
@@ -339,8 +492,10 @@ void RadioManager::jammerTaskCode(void *param) {
             //    Split across both radios: each sweep cycle covers 2x the band.
             // -----------------------------------------------------------------
             case JAM_TARGET_ALL:
-                hopSplit(self->radio, self->radio2, full_channels,
-                         FULL_CHANNELS_COUNT, stop);
+                if (dual) hopSplit(self->radio, self->radio2, full_channels,
+                                   FULL_CHANNELS_COUNT, stop);
+                else hopSingle(singleRadio, full_channels, FULL_CHANNELS_COUNT,
+                               singleChannel, stop);
                 break;
 
             // -----------------------------------------------------------------
@@ -349,7 +504,8 @@ void RadioManager::jammerTaskCode(void *param) {
             //    the two radios for parallel band coverage.
             // -----------------------------------------------------------------
             case JAM_TARGET_ZIGBEE:
-                hopZigbee(self->radio, self->radio2, stop);
+                if (dual) hopZigbee(self->radio, self->radio2, stop);
+                else hopZigbeeSingle(singleRadio, singleChannel, stop);
                 break;
         }
         vTaskDelay(1); // Yield 1 tick so Core 0 IDLE0 can reset the Task Watchdog

@@ -1,6 +1,6 @@
 # RF24 Suite — ESP32-S3 Dual nRF24 2.4 GHz Analyzer
 
-A standalone firmware project for an ESP32-S3, two nRF24L01+ modules, and a 1.8-inch ST7735 TFT. It provides a 2.4 GHz spectrum analyzer, waterfall history, channel inspection, occupancy surveys, RF event recording, CSV logging, per-radio diagnostics, and an RF Test module for controlled laboratory testing.
+A standalone firmware project for an ESP32-S3, one or two nRF24L01+ modules, and a 1.8-inch ST7735 TFT. It provides a 2.4 GHz spectrum analyzer, waterfall history, channel inspection, occupancy surveys, configurable RF event detection, LittleFS session recording, CSV export/replay, and live hardware/performance diagnostics. The default build is receive-only; active RF testing is isolated in a separate controlled-lab build profile.
 
 The interface is designed for a 160 × 128 landscape display. It uses partial/dirty rendering: the complete screen is cleared only during page transitions, while graphs, status values, and menu cards are redrawn only where their content changes. This reduces flicker and keeps the UI responsive.
 
@@ -9,21 +9,24 @@ The interface is designed for a 160 × 128 landscape display. It uses partial/di
 
 ## Features
 
-- Two nRF24L01+ radios on a shared SPI bus with separate CE and CSN pins.
+- One- or two-radio operation with automatic degraded-mode fallback.
+- FreeRTOS mutex protection and contention metrics for the shared nRF24 SPI bus.
 - 126-channel RF24 spectrum analyzer (`0–125`, or `2400–2525 MHz`).
 - Four receive modes: `FAST`, `DIV`, `R1`, and `R2`.
 - `ALL`, `Wi-Fi`, and `Bluetooth` scan ranges.
-- Modern spectrum graph with an intensity gradient and peak hold.
+- Modern spectrum graph with `LIVE`, `AVG`, `MAX`, and baseline-relative `DELTA` traces.
+- Freeze, 1×/2×/4× zoom, cursor, persistent watch markers, and sampling confidence.
 - 24-sweep waterfall with the newest data at the top.
 - Single-channel inspector with live activity and peak readings.
 - Channel survey showing the five channels with the highest average occupancy.
-- RF event detector with a 60% threshold, 750 ms cooldown, and eight-event buffer.
-- One-line-per-sweep CSV logging over USB Serial.
+- RF event detector with configurable threshold, hysteresis, duration, and multi-channel criteria.
+- Buffered LittleFS session recorder (256 KiB cap), USB CSV summary, export, and last-sweep replay.
 - `FAST`, `BALANCED`, `DEEP`, and `CUSTOM` analyzer profiles.
 - Independent connectivity diagnostics for both radios.
-- Three-page System Status based on live ESP32 and radio data.
+- Four-page System Status with live ESP32, radio, build-profile, storage, UI, scan, and SPI timing data.
 - Six selectable display themes: Cyber, Ocean, Amber, Matrix, Violet, and Ice.
-- Persistent configuration using ESP32 NVS.
+- Versioned NVS configuration with validation, delayed writes, migration, and confirmed factory reset.
+- Native analyzer unit tests and GitHub Actions CI for both firmware profiles.
 - Software restart and low-power shutdown using ESP32 deep sleep.
 - Three-second watchdog for automatic recovery from an unresponsive main loop.
 
@@ -103,7 +106,7 @@ The project uses PlatformIO with the Arduino framework.
 1. Install [Visual Studio Code](https://code.visualstudio.com/) and the PlatformIO IDE extension, or install PlatformIO Core.
 2. Open this directory as a PlatformIO project.
 3. Connect the ESP32-S3 using a USB data cable.
-4. Build the firmware:
+4. Build the default receive-only firmware:
 
    ```bash
    pio run
@@ -121,14 +124,22 @@ The project uses PlatformIO with the Arduino framework.
    pio device monitor --baud 115200
    ```
 
-The active environment is defined in `platformio.ini`:
+The default environment is intentionally receive-only:
 
 ```ini
-[env:esp32-s3-devkitc-1]
-platform = espressif32
-board = esp32-s3-devkitc-1
-framework = arduino
+[platformio]
+default_envs = analyzer
 ```
+
+Available environments:
+
+| Environment | Purpose | Build command |
+|---|---|---|
+| `analyzer` | Default receive-only analyzer; active RF Test is not compiled | `pio run -e analyzer` |
+| `authorized_rf_lab` | Enables RF Test for shielded, explicitly authorized lab work | `pio run -e authorized_rf_lab` |
+| `native` | Host-side unit tests for dependency-free analyzer logic | `pio test -e native` |
+
+Upload a specific profile with `pio run -e analyzer -t upload` or, only for an isolated authorized setup, `pio run -e authorized_rf_lab -t upload`.
 
 The current configuration selects a 4 MB upload flash size, the `default.csv` partition table, DIO flash mode, and USB CDC on boot. Adjust `board_upload.flash_size` if the physical board has a different flash capacity.
 
@@ -140,6 +151,7 @@ PlatformIO installs these dependencies automatically:
 - Adafruit ST7735 and ST7789 Library `^1.11.0`
 - Adafruit GFX Library `^1.12.6`
 - `Preferences` and `SPI` from the Arduino ESP32 framework
+- `LittleFS` from the Arduino ESP32 framework
 
 ## User interface
 
@@ -156,22 +168,22 @@ The main menu has two 2 × 3 grid pages. The last page and selected card remain 
 
 | Feature | Purpose | Controls |
 |---|---|---|
-| Spectrum | Live activity graph and peak hold | `UP`: band, `DOWN`: radio mode, `RIGHT`: reset peaks, `B`: back |
+| Spectrum | Live/average/max/delta graph, cursor, zoom, confidence, and hold | Live: tap `UP`: band, tap `DOWN`: radio mode. Frozen: tap `UP/DOWN`: cursor. Tap `RIGHT`: freeze/resume; hold `UP`: trace, hold `DOWN`: zoom, hold `RIGHT`: baseline, hold `B`: watch marker |
 | Waterfall | Last 24 sweeps, newest at the top | `UP`: band, `DOWN`: radio mode, `RIGHT`: clear history |
 | Inspect | Deeper observation of one RF channel | `UP/DOWN`: channel ±1, `RIGHT`: channel +10 |
 | Survey | Top five average channel occupancies | `UP/DOWN`: change band and reset, `RIGHT`: reset survey |
-| Events | Most recent strong-activity events | `RIGHT`: clear events |
-| Logging | Enable one CSV summary per completed sweep | `RIGHT`: start or stop logging |
+| Events | Events that satisfy threshold, hysteresis, duration, and channel-count rules | Tap `UP/DOWN`: threshold/hysteresis; hold `UP/DOWN`: duration/channel count; `RIGHT`: clear |
+| Logging | Record complete sweeps to LittleFS and summaries to USB Serial | `RIGHT`: start or stop a new session |
 
 ### Page 2 — Tools
 
 | Feature | Purpose | Controls |
 |---|---|---|
-| RF Test | Transmission testing in a shielded RF lab | `UP/DOWN`: target, `RIGHT`: start or stop |
+| RX Only / RF Test | RX-only notice in the default profile; controlled transmission screen in the lab profile | Lab profile: `UP/DOWN`: target, `RIGHT`: start or stop |
 | Radio Diag | Check Radio 1 and Radio 2 connectivity | `RIGHT`: refresh |
 | Profiles | Select analyzer sampling depth | `UP/DOWN`: profile, `RIGHT`: change CUSTOM value |
 | Settings | Configure RF power, dwell time, and display theme | `UP/DOWN`: select field, `RIGHT`: next value |
-| Status | Hardware, memory, radio, and software data | `UP/DOWN`: page, `RIGHT`: refresh |
+| Status | Hardware, memory, radio/software, and performance data | `UP/DOWN`: page, `RIGHT`: refresh |
 | Power | Restart or enter deep sleep | `UP/DOWN`: option, `RIGHT`: confirm |
 
 Press `B` to return to the main menu from any feature screen.
@@ -195,6 +207,19 @@ Press `B` to return to the main menu from any feature screen.
 | R1 | Use Radio 1 only |
 | R2 | Use Radio 2 only |
 
+If only one module is detected, requests that require the missing receiver transparently use the available module. With no radios detected, the firmware still boots into its UI and Serial diagnostics instead of entering a reboot loop.
+
+### Analyzer traces and confidence
+
+| Trace | Meaning |
+|---|---|
+| `LIVE` | Carrier-hit percentage from the latest sweep |
+| `AVG` | Exponentially smoothed activity |
+| `MAX` | Highest activity observed since boot or a clear |
+| `DELTA` | Positive change relative to a RAM-only captured baseline |
+
+`Q` on the spectrum screen is observation confidence derived from samples per channel, available receiver count, and baseline availability. It describes acquisition depth, not RF accuracy and not a dBm calibration. Baselines are intentionally not restored after reboot because the RF environment may have changed.
+
 ### Sampling profiles
 
 | Profile | Spectrum | Channel Inspector | Characteristics |
@@ -206,21 +231,21 @@ Press `B` to return to the main menu from any feature screen.
 
 The selected profile and CUSTOM sample count are stored in NVS.
 
-## CSV logging
+## Session recording and CSV logging
 
-Open `Analyze → Logging`, enable recording, and connect a Serial Monitor at 115200 baud. Each line follows this format:
+Open `Analyze → Logging` to start a new session. The previous `/rf_session.csv` is replaced, full 126-channel sweeps are buffered to LittleFS, and a compact summary is printed at 115200 baud:
 
 ```text
-RFLOG,<timestamp_ms>,<sweep>,<peak_channel>,<peak_percent>,<band>,<radio_mode>
+RFLOG,<timestamp_ms>,<sweep>,<peak_channel>,<peak_percent>,<band>,<radio_mode>,<trace>,<confidence>
 ```
 
 Example:
 
 ```text
-RFLOG,18240,57,37,73,Wi-Fi (1-73),FAST
+RFLOG,18240,57,37,73,Wi-Fi (1-73),FAST,LIVE,65
 ```
 
-Logging produces output only while analyzer sweeps are running. Its enabled state is held in RAM and shown as a red badge on the Logging card, but it is not preserved after a reboot.
+The recorder flushes in batches to reduce flash churn and stops at approximately 256 KiB. Use `session export` to stream the stored CSV or `session replay` to load and freeze its most recent complete sweep. Recording state is not restored after reboot.
 
 ## System Status
 
@@ -228,13 +253,14 @@ The Status screen reads live runtime values instead of displaying hard-coded har
 
 1. **Device Info** — chip model, revision and core count, CPU frequency, flash size and clock, and uptime.
 2. **Memory Info** — total, free, and minimum heap, largest allocation block, sketch size, and PSRAM status.
-3. **Radio / Software** — connectivity of each nRF24, scan mode, RF power, ESP-IDF version, and build date.
+3. **Radio / Software** — each nRF24 connection, scan mode, receive-only/lab build, ESP-IDF, and build date.
+4. **Performance** — average/maximum sweep time, UI render time, loop rate, SPI mutex wait, and recorder state.
 
 A radio status of `CONNECTED` confirms SPI communication with the chip. It does not prove that the antenna, RF matching, or receiver sensitivity is working correctly.
 
 ## NVS persistence
 
-The following settings are saved automatically and restored during boot:
+The following settings use schema version 2, validation, and a 1.5-second deferred write:
 
 - RF power.
 - Dwell time.
@@ -242,6 +268,11 @@ The following settings are saved automatically and restored during boot:
 - Analyzer profile.
 - CUSTOM profile sample count.
 - Display theme.
+- Analyzer trace (except `DELTA`, because its environmental baseline is RAM-only).
+- Event detector configuration.
+- Channel watch markers.
+
+Use the exact Serial command `factory reset confirm` to clear the namespace, write validated defaults, and reboot. The explicit confirmation suffix prevents accidental resets.
 
 Waterfall history, survey results, RF events, receive mode, analyzer range, and logging state exist only in RAM and are cleared by a restart or shutdown.
 
@@ -268,6 +299,22 @@ The command interface runs at 115200 baud.
 | `config` / `settings` | Show the current RF configuration |
 | `scan` / `spectrum` | Run one sweep and print an ASCII graph |
 | `inspect <0-125>` | Measure activity on one RF channel |
+| `trace <live\|avg\|max\|delta>` | Select the spectrum trace |
+| `freeze` / `resume` | Hold or resume acquisition |
+| `zoom <1\|2\|4>` | Set graph zoom around the cursor |
+| `cursor <0-125>` | Place the cursor and disable peak-follow |
+| `watch <0-125>` | Toggle a persistent channel marker |
+| `baseline` | Capture the current average as baseline and select `DELTA` |
+| `max clear` | Clear maximum and peak history |
+| `event threshold <5-100>` | Set event trigger percentage |
+| `event hysteresis <0-threshold>` | Set the release margin |
+| `event duration <1-20>` | Set minimum consecutive sweeps |
+| `event channels <1-16>` | Require simultaneous qualifying channels |
+| `session start\|stop\|info` | Control or inspect LittleFS recording |
+| `session export` | Stream the stored full-sweep CSV |
+| `session replay` | Load and freeze the last stored sweep |
+| `perf` | Print scan, UI, loop, and SPI mutex timings |
+| `factory reset confirm` | Restore NVS defaults and reboot |
 | `power` / `pwr` | Show the current RF power |
 | `power <min\|low\|high\|max>` | Change RF power |
 | `dwell` | Show the current dwell time |
@@ -276,7 +323,7 @@ The command interface runs at 115200 baud.
 | `start` | Start RF Test with the active target |
 | `stop` | Stop all transmission |
 
-The `scan` and `inspect` commands stop RF Test first so that both radios enter the correct receive mode.
+The `scan` and `inspect` commands stop RF Test first so that available radios enter the correct receive mode. Transmit commands print an unavailable message in the default `analyzer` build.
 
 ## Firmware architecture
 
@@ -287,11 +334,13 @@ Core 0                          Core 1 / Arduino loop
 │ task (when active)  │         │ Analyzer dispatcher        │
 │                     │         │ Partial display renderer   │
 └──────────┬──────────┘         └─────────────┬──────────────┘
-           └──────── dual nRF24 shared SPI ───┘
+           └──── mutex-protected nRF24 SPI ───┘
 ```
 
 - `AppState` owns UI, analyzer, event, survey, and NVS state.
 - `RadioManager` controls RX/TX transitions and access to both nRF24 modules.
+- `SessionRecorder` buffers full sweeps to LittleFS and supports export/replay.
+- `PerformanceMonitor` captures sweep, UI, loop, and SPI wait behavior.
 - `DisplayManager` implements the menu grid and dirty-region rendering.
 - `MenuCatalog` is the single source of truth for menu labels, destination modes, icons, and open actions.
 - `AppModePolicy` centralizes which screens run continuous spectrum acquisition.
@@ -309,7 +358,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and the f
 | `include/config`, `src/config` | Pin assignments, constants, channel tables, and static assets |
 | `include/core`, `src/core` | Shared types, application state, analyzer aggregation, policies, and NVS |
 | `include/drivers`, `src/drivers` | Buttons, dual-radio lifecycle, RF acquisition, and RF Test task |
-| `include/services`, `src/services` | Serial CLI and watchdog |
+| `include/services`, `src/services` | Serial CLI, watchdog, session recording, and performance metrics |
 | `include/ui`, `src/ui` | Display API, theme, menu catalog, controller, and screen modules |
 | `src/ui/screens` | Renderers grouped into menu, analyzer, and system domains |
 | `src/main.cpp` | Setup, main loop, shutdown, and wake validation |
@@ -323,7 +372,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and the f
 - Verify the separate CE/CSN pins and the shared SCK/MOSI/MISO lines.
 - Install a 10–100 µF capacitor close to each module.
 - Use short wires and a supply that does not sag when both radios are active.
-- The firmware makes up to five initialization attempts and reboots if both radios are not ready.
+- The firmware makes up to five initialization attempts. It runs with either radio, and stays in diagnostics-only mode if neither responds.
 
 ### The ESP32 resets or reports a brownout
 
@@ -353,10 +402,10 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and the f
 
 - The analyzer measures carrier-detection probability, not absolute RSSI or protocol identity.
 - It does not decode Wi-Fi, Bluetooth, BLE, or Zigbee packets.
-- Waterfall, survey, and event history are not persisted to flash.
+- Waterfall, survey, event history, and environmental baselines are RAM-only; recorded sweeps use LittleFS.
 - The ST7735 renderer does not use a full framebuffer; partial rendering is used to save RAM.
 - Software shutdown does not physically disconnect board power.
-- There are no automated hardware-in-the-loop tests; final verification must be performed on the physical device.
+- Native tests cover dependency-free analyzer math, but radio timing, display offsets, wake behavior, and RF behavior still require hardware-in-the-loop verification.
 
 ## Contributing
 
@@ -364,7 +413,9 @@ Before submitting changes, run:
 
 ```bash
 pio run --target clean
-pio run
+pio test -e native
+pio run -e analyzer
+pio run -e authorized_rf_lab
 ```
 
 Keep pin definitions in `include/config/Config.h`, avoid full-screen redraws for dynamic updates, and document changes to Serial or NVS formats to preserve user compatibility.

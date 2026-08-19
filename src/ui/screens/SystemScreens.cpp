@@ -1,6 +1,8 @@
 #include "ui/DisplayManager.h"
 #include "ui/DisplaySupport.h"
 #include "drivers/RadioManager.h"
+#include "services/PerformanceMonitor.h"
+#include "services/SessionRecorder.h"
 
 using namespace DisplayUi;
 
@@ -67,7 +69,9 @@ void DisplayManager::renderSettingsScreen() {
 // RENDER STATUS SCREEN (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderStatusScreen() {
-    static const char* pageTitles[] = {"DEVICE INFO", "MEMORY INFO", "RADIO / SW"};
+    static const char* pageTitles[] = {
+        "DEVICE INFO", "MEMORY INFO", "RADIO / SW", "PERFORMANCE"
+    };
     const char* labels[6];
     String values[6];
     uint16_t colors[6] = {
@@ -98,19 +102,34 @@ void DisplayManager::renderStatusScreen() {
         colors[1] = SPECTRUM_LOW;
         colors[2] = SPECTRUM_HIGH;
         colors[5] = psramTotal == 0 ? ST77XX_GRAY : SPECTRUM_LOW;
-    } else {
+    } else if (statusPage == 2) {
         const bool radio1Ok = radioManager.isRadio1Connected();
         const bool radio2Ok = radioManager.isRadio2Connected();
         labels[0] = "RADIO 1";   values[0] = radio1Ok ? "CONNECTED" : "NOT FOUND";
         labels[1] = "RADIO 2";   values[1] = radio2Ok ? "CONNECTED" : "NOT FOUND";
         labels[2] = "SCAN MODE"; values[2] = appState.getAnalyzerRadioModeName();
-        labels[3] = "RF POWER";  values[3] = appState.getPowerLevelName();
-        labels[4] = "ESP-IDF";   values[4] = ESP.getSdkVersion();
-        labels[5] = "BUILD";     values[5] = __DATE__;
+        labels[3] = "BUILD MODE"; values[3] = radioManager.transmitFeaturesEnabled() ? "RF LAB" : "RX ONLY";
+        labels[4] = "ESP-IDF";    values[4] = ESP.getSdkVersion();
+        labels[5] = "FW BUILD";   values[5] = __DATE__;
         colors[0] = radio1Ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
         colors[1] = radio2Ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
         colors[2] = SPECTRUM_ACCENT;
         colors[3] = SPECTRUM_HIGH;
+    } else {
+        const PerformanceSnapshot perf = performanceMonitor.snapshot();
+        labels[0] = "SWEEP AVG"; values[0] = String(perf.averageSweepUs / 1000.0f, 1) + " ms";
+        labels[1] = "SWEEP MAX"; values[1] = String(perf.maxSweepUs / 1000.0f, 1) + " ms";
+        labels[2] = "UI AVG";    values[2] = String(perf.averageUiUs) + " us";
+        labels[3] = "LOOP RATE"; values[3] = String(perf.loopsPerSecond) + " Hz";
+        labels[4] = "SPI WAIT";  values[4] = String(radioManager.getAverageBusWaitUs()) + "/" +
+                                               String(radioManager.getMaxBusWaitUs()) + " us";
+        labels[5] = "SESSION";   values[5] = sessionRecorder.isRecording() ?
+                                              String(sessionRecorder.recordedSweeps()) + " sweeps" : "STOPPED";
+        colors[0] = SPECTRUM_ACCENT;
+        colors[1] = SPECTRUM_HIGH;
+        colors[2] = SPECTRUM_LOW;
+        colors[4] = radioManager.getBusTimeouts() == 0 ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
+        colors[5] = sessionRecorder.isRecording() ? SPECTRUM_CRITICAL : ST77XX_GRAY;
     }
 
     const bool layoutChanged = renderedStatusPage != statusPage;
@@ -120,7 +139,7 @@ void DisplayManager::renderStatusScreen() {
         tft.setCursor(139, 3);
         tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_BORDER);
         tft.print(statusPage + 1);
-        tft.print("/3");
+        tft.print("/4");
         tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
         tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
         drawModernFooter("U/D PAGE", "R REF", "B BACK");

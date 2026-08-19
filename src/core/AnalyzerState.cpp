@@ -1,4 +1,6 @@
 #include "core/AppState.h"
+#include "core/AnalyzerMath.h"
+#include "services/SessionRecorder.h"
 
 void AppState::cycleAnalyzerBand(int direction) {
     int current = (int)analyzerBand;
@@ -41,7 +43,7 @@ void AppState::cycleScanProfile(int direction) {
     current = (current + direction + total) % total;
     scanProfile = static_cast<ScanProfile>(current);
     resetPeaks();
-    saveSettings();
+    markSettingsDirty();
 }
 
 const char* AppState::getScanProfileName() const {
@@ -76,33 +78,129 @@ void AppState::cycleCustomSampleCount() {
     customSpectrumSamples += 10;
     if (customSpectrumSamples > 100) customSpectrumSamples = 10;
     resetPeaks();
-    saveSettings();
+    markSettingsDirty();
 }
 
-void AppState::recordCompletedSweep() {
+void AppState::cycleAnalyzerTraceMode(int direction) {
+    int current = static_cast<int>(analyzerTraceMode);
+    current = (current + direction + ANALYZER_TRACE_COUNT) % ANALYZER_TRACE_COUNT;
+    analyzerTraceMode = static_cast<AnalyzerTraceMode>(current);
+    markSettingsDirty();
+}
+
+const char* AppState::getAnalyzerTraceModeName() const {
+    switch (analyzerTraceMode) {
+        case ANALYZER_TRACE_AVERAGE: return "AVG";
+        case ANALYZER_TRACE_MAX:     return "MAX";
+        case ANALYZER_TRACE_DELTA:   return "DELTA";
+        case ANALYZER_TRACE_LIVE:
+        default:                     return "LIVE";
+    }
+}
+
+void AppState::cycleAnalyzerZoom() {
+    analyzerZoom = analyzerZoom == 1 ? 2 : (analyzerZoom == 2 ? 4 : 1);
+}
+
+void AppState::setCursorChannel(int channel, bool followPeak) {
+    cursorChannel = constrain(channel, MIN_CHANNEL, MAX_CHANNEL);
+    cursorFollowsPeak = followPeak;
+}
+
+void AppState::toggleWatchChannel(int channel) {
+    channel = constrain(channel, MIN_CHANNEL, MAX_CHANNEL);
+    watchedChannels[channel] = !watchedChannels[channel];
+    markSettingsDirty();
+}
+
+void AppState::captureBaseline() {
+    for (int ch = 0; ch < TOTAL_CHANNELS; ch++) {
+        baselineLevels[ch] = surveySweeps > 0 ? averageLevels[ch] : spectrumLevels[ch];
+    }
+    baselineValid = true;
+    analyzerTraceMode = ANALYZER_TRACE_DELTA;
+}
+
+void AppState::clearAnalyzerMax() {
+    memset(maxLevels, 0, sizeof(maxLevels));
+    resetPeaks();
+}
+
+uint8_t AppState::getTraceLevel(int channel) const {
+    channel = constrain(channel, MIN_CHANNEL, MAX_CHANNEL);
+    switch (analyzerTraceMode) {
+        case ANALYZER_TRACE_AVERAGE: return averageLevels[channel];
+        case ANALYZER_TRACE_MAX:     return maxLevels[channel];
+        case ANALYZER_TRACE_DELTA:
+            return baselineValid ? AnalyzerMath::deltaAboveBaseline(
+                                       spectrumLevels[channel], baselineLevels[channel]) : 0;
+        case ANALYZER_TRACE_LIVE:
+        default:                     return spectrumLevels[channel];
+    }
+}
+
+void AppState::configureEventEngine(uint8_t threshold, uint8_t hysteresis,
+                                    uint8_t minSweeps, uint8_t minChannels) {
+    eventThreshold = constrain(threshold, 5, 100);
+    eventHysteresis = constrain(hysteresis, 0, eventThreshold);
+    eventMinSweeps = constrain(minSweeps, 1, 20);
+    eventMinChannels = constrain(minChannels, 1, 16);
+    memset(eventRunLength, 0, sizeof(eventRunLength));
+    eventLatched = false;
+    markSettingsDirty();
+}
+
+void AppState::recordCompletedSweep(uint8_t receiverCount) {
     for (int ch = 0; ch < TOTAL_CHANNELS; ch++) {
         waterfall[waterfallHead][ch] = spectrumLevels[ch];
         occupancyTotal[ch] += spectrumLevels[ch];
+        averageLevels[ch] = surveySweeps == 0 ? spectrumLevels[ch] :
+                            AnalyzerMath::ema(averageLevels[ch], spectrumLevels[ch]);
+        if (spectrumLevels[ch] > maxLevels[ch]) maxLevels[ch] = spectrumLevels[ch];
+        eventRunLength[ch] = AnalyzerMath::nextEventRun(
+            eventRunLength[ch], spectrumLevels[ch], eventThreshold, eventHysteresis);
     }
     waterfallHead = (waterfallHead + 1) % WATERFALL_ROWS;
     if (waterfallCount < WATERFALL_ROWS) waterfallCount++;
     surveySweeps++;
+    analyzerConfidence = AnalyzerMath::observationConfidence(
+        getSpectrumSampleCount(), receiverCount, baselineValid);
+    if (cursorFollowsPeak) cursorChannel = peakChannel;
 
     const unsigned long now = millis();
-    if (peakLevel >= 60 && now - lastEventMs >= 750) {
+    int activeChannels = 0;
+    uint8_t longestRun = 0;
+    int minCh, maxCh;
+    getAnalyzerChannelRange(minCh, maxCh);
+    for (int ch = minCh; ch <= maxCh; ch++) {
+        if (eventRunLength[ch] >= eventMinSweeps) {
+            activeChannels++;
+            if (eventRunLength[ch] > longestRun) longestRun = eventRunLength[ch];
+        }
+    }
+
+    if (!eventLatched && activeChannels >= eventMinChannels &&
+        now - lastEventMs >= 250) {
         rfEvents[eventHead].timestampMs = now;
         rfEvents[eventHead].channel = static_cast<uint8_t>(peakChannel);
         rfEvents[eventHead].level = peakLevel;
+        rfEvents[eventHead].channelCount = static_cast<uint8_t>(min(activeChannels, 255));
+        rfEvents[eventHead].durationSweeps = longestRun;
         eventHead = (eventHead + 1) % RF_EVENT_COUNT;
         if (eventCount < RF_EVENT_COUNT) eventCount++;
         lastEventMs = now;
+        eventLatched = true;
+    } else if (activeChannels == 0) {
+        eventLatched = false;
     }
 
     if (loggingEnabled) {
-        Serial.printf("RFLOG,%lu,%lu,%d,%u,%s,%s\n", now,
+        Serial.printf("RFLOG,%lu,%lu,%d,%u,%s,%s,%s,%u\n", now,
                       static_cast<unsigned long>(surveySweeps), peakChannel,
-                      peakLevel, getAnalyzerBandName(), getAnalyzerRadioModeName());
+                      peakLevel, getAnalyzerBandName(), getAnalyzerRadioModeName(),
+                      getAnalyzerTraceModeName(), analyzerConfidence);
     }
+    sessionRecorder.recordSweep(*this);
 }
 
 void AppState::resetSurvey() {
@@ -115,6 +213,8 @@ void AppState::clearEvents() {
     eventHead = 0;
     eventCount = 0;
     lastEventMs = 0;
+    memset(eventRunLength, 0, sizeof(eventRunLength));
+    eventLatched = false;
 }
 
 void AppState::getAnalyzerChannelRange(int &minCh, int &maxCh) const {

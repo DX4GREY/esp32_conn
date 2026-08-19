@@ -7,9 +7,9 @@ This document describes the module boundaries used by RF24 Suite and the expecte
 ```text
 include/
 ├── config/       Hardware pins and compile-time constants
-├── core/         Application types, global state, and mode policies
+├── core/         Application types, analyzer math/state, and mode policies
 ├── drivers/      Buttons and dual nRF24 interfaces
-├── services/     Serial CLI and watchdog
+├── services/     Serial CLI, recorder, performance metrics, and watchdog
 └── ui/           Display API, shared theme, and menu metadata
 
 src/
@@ -48,13 +48,14 @@ services          UI controller/screens
 - `AppTypes.h`: shared enums and small data structures.
 - `AppState.h`: the public state contract used by the application.
 - `AppState.cpp`: RF Test target, power, and dwell configuration.
-- `AnalyzerState.cpp`: analyzer profiles, history, events, survey, and peaks.
-- `SettingsStore.cpp`: NVS load/save only.
+- `AnalyzerMath.h`: dependency-free averaging, delta, confidence, and event-run primitives used by native tests.
+- `AnalyzerState.cpp`: analyzer traces, baseline, confidence, watchlist, configurable events, survey, and peaks.
+- `SettingsStore.cpp`: schema-versioned NVS validation, migration, delayed writes, and factory reset.
 - `AppModePolicy.cpp`: decides which screens require continuous spectrum sweeps.
 
 ### Drivers
 
-- `RadioManager.cpp`: radio initialization, RX/TX lifecycle, and the Core 0 RF Test task.
+- `RadioManager.cpp`: one/two-radio discovery, shared-SPI mutex and metrics, RX/TX lifecycle, and the optional Core 0 RF Test task.
 - `RadioAnalyzer.cpp`: spectrum and single-channel acquisition.
 - `ButtonManager.cpp`: debounced edge and long-press detection.
 
@@ -68,6 +69,13 @@ services          UI controller/screens
 - `screens/MenuScreens.cpp`: main menu and RF Test renderers.
 - `screens/AnalyzerScreens.cpp`: spectrum, waterfall, survey, event, logging, diagnostics, profile, and inspector renderers.
 - `screens/SystemScreens.cpp`: settings, status, restart, shutdown, and power renderers.
+
+### Services
+
+- `SessionRecorder.cpp`: buffered LittleFS sessions, size limiting, CSV export, and last-sweep replay.
+- `PerformanceMonitor.cpp`: smoothed scan/UI duration, maxima, and loop-rate tracking.
+- `SerialCommander.cpp`: CLI routing and machine-readable/diagnostic output.
+- `Watchdog.cpp`: main-loop liveness monitoring.
 
 ## Adding a new display feature
 
@@ -102,19 +110,21 @@ Menu labels and mode routing must not be duplicated inside the renderer. `MenuCa
 
 ## Persistence rules
 
-- Only user configuration belongs in NVS.
-- High-rate analyzer data, waterfall rows, events, and temporary UI state stay in RAM.
+- Only compact user configuration belongs in NVS; writes must be marked dirty and deferred.
+- Full sweep sessions belong in LittleFS, while waterfall rows, events, and temporary UI state stay in RAM.
 - Add all new NVS keys in `SettingsStore.cpp` and provide a safe default.
 - Validate stored enum and numeric values before using them.
 - Keep keys short because ESP32 Preferences/NVS key length is limited.
+- Increment the schema when persisted structure semantics change and preserve migration from earlier keys.
 
 ## Verification
 
 Run a clean build after structural or dependency changes:
 
 ```bash
-pio run --target clean
-pio run
+pio test -e native
+pio run -e analyzer
+pio run -e authorized_rf_lab
 ```
 
 Before testing on hardware, also verify:

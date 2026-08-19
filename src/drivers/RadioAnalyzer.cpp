@@ -1,9 +1,11 @@
 #include "drivers/RadioManager.h"
 
 void RadioManager::scanSpectrum(void (*yieldCb)()) {
+    if (!hasAnyRadio()) return;
     if (!rxModeActive) {
         enterRxMode();
     }
+    if (!lockBus(pdMS_TO_TICKS(250))) return;
 
     int minCh, maxCh;
     appState.getAnalyzerChannelRange(minCh, maxCh);
@@ -23,7 +25,8 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
         }
     };
 
-    if (appState.analyzerRadioMode == ANALYZER_RADIO_FAST) {
+    if (appState.analyzerRadioMode == ANALYZER_RADIO_FAST &&
+        radio1Available && radio2Available) {
         // Each radio listens on a different channel during the same sample
         // window. Shared SPI setup remains sequential, but RF observation is
         // parallel, reducing a full-band sweep to roughly half as many windows.
@@ -53,8 +56,16 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
         }
     } else {
         for (int ch = minCh; ch <= maxCh; ch++) {
-            const bool useRadio1 = appState.analyzerRadioMode != ANALYZER_RADIO_2;
-            const bool useRadio2 = appState.analyzerRadioMode != ANALYZER_RADIO_1;
+            bool useRadio1 = radio1Available &&
+                             appState.analyzerRadioMode != ANALYZER_RADIO_2;
+            bool useRadio2 = radio2Available &&
+                             appState.analyzerRadioMode != ANALYZER_RADIO_1;
+            // Requested radio may be offline: transparently use the remaining
+            // receiver so the analyzer continues to produce valid data.
+            if (!useRadio1 && !useRadio2) {
+                useRadio1 = radio1Available;
+                useRadio2 = !useRadio1 && radio2Available;
+            }
             if (useRadio1) radio.setChannel(ch);
             if (useRadio2) radio2.setChannel(ch);
             delayMicroseconds(35);
@@ -83,23 +94,28 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
     appState.peakChannel = highestCh;
     appState.peakLevel = highestLvl;
     appState.decayPeaks();
-    appState.recordCompletedSweep();
+    unlockBus();
+    appState.recordCompletedSweep(availableRadioCount());
 }
 
 uint8_t RadioManager::inspectChannel(int channel) {
+    if (!hasAnyRadio()) return 0;
     if (!rxModeActive) {
         enterRxMode();
     }
+    if (!lockBus(pdMS_TO_TICKS(250))) return appState.inspectedLevel;
 
     channel = constrain(channel, MIN_CHANNEL, MAX_CHANNEL);
-    radio.setChannel(channel);
-    radio2.setChannel(channel);
+    if (radio1Available) radio.setChannel(channel);
+    if (radio2Available) radio2.setChannel(channel);
     delayMicroseconds(40);
 
     const int sampleCount = appState.getInspectSampleCount();
     int hits = 0;
     for (int s = 0; s < sampleCount; s++) {
-        if (radio.testRPD() || radio.testCarrier() || radio2.testRPD() || radio2.testCarrier()) {
+        const bool hit1 = radio1Available && (radio.testRPD() || radio.testCarrier());
+        const bool hit2 = radio2Available && (radio2.testRPD() || radio2.testCarrier());
+        if (hit1 || hit2) {
             hits++;
         }
         delayMicroseconds(12);
@@ -111,6 +127,8 @@ uint8_t RadioManager::inspectChannel(int channel) {
     if (lvl > appState.inspectedPeak) {
         appState.inspectedPeak = lvl;
     }
+
+    unlockBus();
 
     return lvl;
 }

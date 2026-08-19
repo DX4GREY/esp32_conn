@@ -1,6 +1,7 @@
 #include "ui/DisplayManager.h"
 #include "ui/DisplaySupport.h"
 #include "ui/MenuCatalog.h"
+#include "drivers/RadioManager.h"
 
 using namespace DisplayUi;
 
@@ -155,6 +156,27 @@ void DisplayManager::renderMainMenu() {
 // RENDER JAMMER SCREEN (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderJammerScreen() {
+    if (!radioManager.transmitFeaturesEnabled()) {
+        if (!jammerLayoutDrawn) {
+            drawModernHeader("ANALYZER BUILD", SPECTRUM_LOW);
+            tft.fillRoundRect(9, 24, 142, 70, 6, SPECTRUM_CARD_BG);
+            tft.drawRoundRect(9, 24, 142, 70, 6, SPECTRUM_BORDER);
+            tft.setCursor(38, 36);
+            tft.setTextColor(SPECTRUM_LOW, SPECTRUM_CARD_BG);
+            tft.print("RECEIVE ONLY");
+            tft.setCursor(20, 54);
+            tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+            tft.print("Active RF test is");
+            tft.setCursor(29, 66);
+            tft.print("not compiled.");
+            tft.setCursor(17, 82);
+            tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+            tft.print("Use RF LAB profile");
+            drawModernFooter("", "", "B BACK");
+            jammerLayoutDrawn = true;
+        }
+        return;
+    }
     if (!jammerLayoutDrawn) {
         drawModernHeader("RF CONTROL", SPECTRUM_HIGH);
         tft.fillRoundRect(5, 17, 150, 34, 4, SPECTRUM_CARD_BG);

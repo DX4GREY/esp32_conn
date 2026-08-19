@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <RF24.h>
+#include <freertos/FreeRTOS.h>
 #include "config/Config.h"
 #include "core/AppState.h"
 
@@ -26,15 +27,30 @@ public:
     bool isConnected();
     bool isRadio1Connected();
     bool isRadio2Connected();
-    RF24& getRadio() { return radio; }
-
+    bool hasAnyRadio() const;
+    uint8_t availableRadioCount() const;
+    uint32_t getBusContentions() const;
+    uint32_t getBusTimeouts() const;
+    uint32_t getMaxBusWaitUs() const;
+    uint32_t getAverageBusWaitUs() const;
+    static constexpr bool transmitFeaturesEnabled() {
+#if RF_LAB_TX_ENABLED
+        return true;
+#else
+        return false;
+#endif
+    }
 private:
     RF24 radio;
     RF24 radio2;
+    volatile bool radio1Available = false;
+    volatile bool radio2Available = false;
     bool rxModeActive = false;
     TaskHandle_t jammerTaskHandle = NULL;
     volatile bool stopJam = false;
 
+    bool lockBus(TickType_t timeout = pdMS_TO_TICKS(100));
+    void unlockBus();
     void applyTxConfig();
     static void jammerTaskCode(void *param);
 };

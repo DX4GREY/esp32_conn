@@ -24,6 +24,8 @@
 #include "drivers/RadioManager.h"
 #include "ui/DisplayManager.h"
 #include "services/SerialCommander.h"
+#include "services/SessionRecorder.h"
+#include "services/PerformanceMonitor.h"
 
 static constexpr unsigned long WAKE_HOLD_MS = 1500;
 
@@ -80,6 +82,9 @@ void setup() {
 
     // 1b. Load persisted settings (power level, dwell time, jammer target)
     appState.loadSettings();
+    if (!sessionRecorder.begin()) {
+        Serial.println("Session recorder unavailable: " + String(sessionRecorder.lastError()));
+    }
 
     // 2. Initialize Navigation Buttons (Pull-Up)
     buttonManager.init();
@@ -92,12 +97,9 @@ void setup() {
 
     // 4. Initialize nRF24L01+ Radio (init() retries internally before failing)
     if (!radioManager.init()) {
-        // Don't hard-hang the system. The MAX-AGGRESSION RF load can briefly
-        // brownout / lock the modules; a clean reboot retries init instead of
-        // bricking the device until a manual power cycle.
-        Serial.println("Radio init failed. Rebooting to retry...");
-        delay(2000);
-        ESP.restart();
+        // Keep the UI, status, storage, and Serial diagnostics available. A
+        // disconnected module can then be diagnosed without a reboot loop.
+        Serial.println("No radio detected; continuing in diagnostics-only mode.");
     }
 
     // 5. Initialize Hardware Watchdog (3.0s Timeout)
@@ -108,6 +110,7 @@ void setup() {
 // MAIN LOOP (CORE 1: UI, SERIAL, & SPECTRUM DISPATCHER)
 // =============================================================================
 void loop() {
+    performanceMonitor.tickLoop();
     // 1. Reset Watchdog Timer (Heartbeat)
     watchdog.feed();
 
@@ -119,9 +122,12 @@ void loop() {
 
     // 4. Execute Based on Active Mode
     if (AppModePolicy::runsSpectrumScan(appState.appMode,
-                                        appState.loggingEnabled)) {
+                                        appState.loggingEnabled) &&
+        !appState.analyzerFrozen) {
         // Radio Analyzer Mode: Scan 126 channels and update spectrum levels
+        const uint32_t scanStartedUs = micros();
         radioManager.scanSpectrum(yieldToUI);
+        performanceMonitor.recordSweep(micros() - scanStartedUs);
     } else if (appState.appMode == APP_MODE_ANALYZER_CHANNEL) {
         // Channel Inspector Mode: Deep RF monitoring on a single channel
         // (no per-loop requestRedraw => only dynamic areas are updated,
@@ -138,7 +144,15 @@ void loop() {
     }
 
     // 5. Render TFT screen if there are updates
+    const uint32_t uiStartedUs = micros();
     displayManager.updateUI();
+    performanceMonitor.recordUi(micros() - uiStartedUs);
+    sessionRecorder.service();
+    if (appState.loggingEnabled && !sessionRecorder.isRecording()) {
+        appState.loggingEnabled = false;
+        displayManager.requestRedraw();
+    }
+    appState.serviceSettingsPersistence();
 
     // 5b. Reboot System: show message then restart ESP32
     if (appState.appMode == APP_MODE_REBOOT) {
