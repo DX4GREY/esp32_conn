@@ -109,10 +109,10 @@ void DisplayManager::showSplash() {
 }
 
 uint16_t DisplayManager::getSignalColor(uint8_t level) {
-    if (level < 30) return ST77XX_GREEN;
-    if (level < 65) return ST77XX_YELLOW;
-    if (level < 85) return CUSTOM_ORANGE;
-    return ST77XX_RED;
+    if (level < 30) return SPECTRUM_LOW;
+    if (level < 65) return SPECTRUM_MID;
+    if (level < 85) return SPECTRUM_HIGH;
+    return SPECTRUM_CRITICAL;
 }
 
 void DisplayManager::drawModernHeader(const char* title, uint16_t accent) {
@@ -127,10 +127,10 @@ void DisplayManager::drawModernHeader(const char* title, uint16_t accent) {
 }
 
 void DisplayManager::drawFooterChip(int x, int width, const char* label) {
-    tft.fillRoundRect(x, 107, width, 16, 3, 0x10A2);
+    tft.fillRoundRect(x, 107, width, 16, 3, DISPLAY_FOOTER_BG);
     int textX = x + (width - static_cast<int>(strlen(label)) * 6) / 2;
     tft.setCursor(textX, 111);
-    tft.setTextColor(SPECTRUM_ACCENT, 0x10A2);
+    tft.setTextColor(SPECTRUM_ACCENT, DISPLAY_FOOTER_BG);
     tft.print(label);
 }
 

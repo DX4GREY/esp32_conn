@@ -183,3 +183,22 @@ const char* AppState::getDwellTimeName() const {
         default:   return "Custom";
     }
 }
+
+void AppState::cycleDisplayTheme(int direction) {
+    int current = static_cast<int>(displayTheme);
+    current = (current + direction + DISPLAY_THEME_COUNT) % DISPLAY_THEME_COUNT;
+    displayTheme = static_cast<DisplayThemeId>(current);
+    saveSettings();
+}
+
+const char* AppState::getDisplayThemeName() const {
+    switch (displayTheme) {
+        case DISPLAY_THEME_OCEAN:  return "OCEAN";
+        case DISPLAY_THEME_AMBER:  return "AMBER";
+        case DISPLAY_THEME_MATRIX: return "MATRIX";
+        case DISPLAY_THEME_VIOLET: return "VIOLET";
+        case DISPLAY_THEME_ICE:    return "ICE";
+        case DISPLAY_THEME_CYBER:
+        default:                   return "CYBER";
+    }
+}

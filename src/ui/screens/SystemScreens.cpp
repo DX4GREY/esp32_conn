@@ -11,19 +11,26 @@ void DisplayManager::renderSettingsScreen() {
         settingsLayoutDrawn = true;
     }
 
-    bool pwrSelected = (settingsSelection == 0);
-    uint16_t pwrBg = pwrSelected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
-    tft.fillRect(5, 17, 150, 39, ST77XX_BLACK);
-    tft.fillRoundRect(5, 17, 150, 39, 4, pwrBg);
-    tft.drawRoundRect(5, 17, 150, 39, 4,
-                      pwrSelected ? SPECTRUM_ACCENT : SPECTRUM_BORDER);
-    if (pwrSelected) tft.fillRoundRect(8, 21, 3, 31, 1, SPECTRUM_ACCENT);
+    auto drawSettingCard = [&](int item, int y, const char* label) {
+        const bool selected = settingsSelection == item;
+        const uint16_t background = selected ?
+                                    SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
+        tft.fillRect(5, y, 150, 26, ST77XX_BLACK);
+        tft.fillRoundRect(5, y, 150, 26, 4, background);
+        tft.drawRoundRect(5, y, 150, 26, 4,
+                          selected ? SPECTRUM_ACCENT : SPECTRUM_BORDER);
+        if (selected) {
+            tft.fillRoundRect(8, y + 4, 3, 18, 1, SPECTRUM_ACCENT);
+        }
+        tft.setCursor(15, y + 4);
+        tft.setTextColor(selected ? SPECTRUM_ACCENT : ST77XX_GRAY,
+                         background);
+        tft.print(label);
+        return background;
+    };
 
-    tft.setCursor(15, 21);
-    tft.setTextColor(pwrSelected ? SPECTRUM_ACCENT : ST77XX_GRAY, pwrBg);
-    tft.print("TX POWER");
-
-    tft.setCursor(15, 33);
+    const uint16_t pwrBg = drawSettingCard(0, 17, "TX POWER");
+    tft.setCursor(15, 31);
     uint16_t pwrColor = ST77XX_WHITE;
     if (appState.powerLevel == RF24_PA_MAX) pwrColor = SPECTRUM_CRITICAL;
     else if (appState.powerLevel == RF24_PA_HIGH) pwrColor = SPECTRUM_HIGH;
@@ -31,29 +38,25 @@ void DisplayManager::renderSettingsScreen() {
     else pwrColor = SPECTRUM_LOW;
     tft.setTextColor(pwrColor, pwrBg);
     tft.print(appState.getPowerLevelName());
-    tft.setCursor(15, 45);
-    tft.setTextColor(ST77XX_GRAY, pwrBg);
-    tft.print("Radio output level");
 
-    bool dwellSelected = (settingsSelection == 1);
-    uint16_t dwellBg = dwellSelected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
-    tft.fillRect(5, 60, 150, 39, ST77XX_BLACK);
-    tft.fillRoundRect(5, 60, 150, 39, 4, dwellBg);
-    tft.drawRoundRect(5, 60, 150, 39, 4,
-                      dwellSelected ? SPECTRUM_ACCENT : SPECTRUM_BORDER);
-    if (dwellSelected) tft.fillRoundRect(8, 64, 3, 31, 1, SPECTRUM_ACCENT);
-
-    tft.setCursor(15, 64);
-    tft.setTextColor(dwellSelected ? SPECTRUM_ACCENT : ST77XX_GRAY, dwellBg);
-    tft.print("SAMPLE DWELL");
-    tft.setCursor(15, 76);
+    const uint16_t dwellBg = drawSettingCard(1, 45, "SAMPLE DWELL");
+    tft.setCursor(15, 59);
     tft.setTextColor(SPECTRUM_ACCENT, dwellBg);
     tft.print(appState.getDwellTimeName());
-    tft.setCursor(15, 88);
-    tft.setTextColor(ST77XX_GRAY, dwellBg);
-    tft.print("Channel timing: ");
-    tft.print(appState.dwellTimeUs);
-    tft.print(" us");
+
+    const uint16_t themeBg = drawSettingCard(2, 73, "DISPLAY THEME");
+    tft.setCursor(15, 87);
+    tft.setTextColor(SPECTRUM_ACCENT, themeBg);
+    tft.print(appState.getDisplayThemeName());
+
+    // Compact palette preview for the active theme.
+    const uint16_t swatches[5] = {
+        SPECTRUM_LOW, SPECTRUM_MID, SPECTRUM_HIGH,
+        SPECTRUM_CRITICAL, SPECTRUM_ACCENT
+    };
+    for (int i = 0; i < 5; i++) {
+        tft.fillRoundRect(98 + i * 10, 86, 8, 8, 2, swatches[i]);
+    }
 
     previousSettingsSelection = settingsSelection;
     previousPowerLevel = static_cast<int>(appState.powerLevel);

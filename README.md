@@ -22,6 +22,7 @@ The interface is designed for a 160 × 128 landscape display. It uses partial/di
 - `FAST`, `BALANCED`, `DEEP`, and `CUSTOM` analyzer profiles.
 - Independent connectivity diagnostics for both radios.
 - Three-page System Status based on live ESP32 and radio data.
+- Six selectable display themes: Cyber, Ocean, Amber, Matrix, Violet, and Ice.
 - Persistent configuration using ESP32 NVS.
 - Software restart and low-power shutdown using ESP32 deep sleep.
 - Three-second watchdog for automatic recovery from an unresponsive main loop.
@@ -169,7 +170,7 @@ The main menu has two 2 × 3 grid pages. The last page and selected card remain 
 | RF Test | Transmission testing in a shielded RF lab | `UP/DOWN`: target, `RIGHT`: start or stop |
 | Radio Diag | Check Radio 1 and Radio 2 connectivity | `RIGHT`: refresh |
 | Profiles | Select analyzer sampling depth | `UP/DOWN`: profile, `RIGHT`: change CUSTOM value |
-| Settings | Configure RF power and dwell time | `UP/DOWN`: select field, `RIGHT`: next value |
+| Settings | Configure RF power, dwell time, and display theme | `UP/DOWN`: select field, `RIGHT`: next value |
 | Status | Hardware, memory, radio, and software data | `UP/DOWN`: page, `RIGHT`: refresh |
 | Power | Restart or enter deep sleep | `UP/DOWN`: option, `RIGHT`: confirm |
 
@@ -240,6 +241,7 @@ The following settings are saved automatically and restored during boot:
 - Last RF Test target.
 - Analyzer profile.
 - CUSTOM profile sample count.
+- Display theme.
 
 Waterfall history, survey results, RF events, receive mode, analyzer range, and logging state exist only in RAM and are cleared by a restart or shutdown.
 

@@ -61,6 +61,7 @@ services          UI controller/screens
 ### UI
 
 - `DisplayManager.cpp`: TFT initialization, shared primitives, splash, and caches.
+- `DisplayTheme.cpp`: selectable RGB565 palettes resolved from the active theme.
 - `DisplayController.cpp`: mode dispatch and physical-button input routing.
 - `MenuCatalog.cpp`: labels, icons, destination modes, and open actions for every menu card.
 - `DisplaySupport.h`: shared theme colors and formatting helpers.
@@ -95,6 +96,7 @@ Menu labels and mode routing must not be duplicated inside the renderer. `MenuCa
 - A full-screen clear is allowed only when switching to a different page layout.
 - Dynamic screens should redraw dirty values, columns, cards, or graph regions only.
 - Keep common colors and formatting in `DisplaySupport.h`.
+- Add new palettes to `DisplayTheme.cpp`, then extend `DisplayThemeId` and its display name together.
 - Cache previously rendered values in `DisplayManager` when updates are frequent.
 - Throttle high-frequency rendering independently from RF acquisition.
 

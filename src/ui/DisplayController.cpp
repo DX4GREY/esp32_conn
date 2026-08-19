@@ -276,15 +276,23 @@ void DisplayManager::processInput() {
     // CONDITION 5: RF SETTINGS
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_SETTINGS) {
-        if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
-            settingsSelection = (settingsSelection + 1) % 2;
+        if (buttonManager.isPressed(BTN_UP)) {
+            settingsSelection = (settingsSelection + 2) % 3;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            settingsSelection = (settingsSelection + 1) % 3;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             if (settingsSelection == 0) {
                 appState.cyclePowerLevel(1);
                 radioManager.updatePALevel(appState.powerLevel);
-            } else {
+            } else if (settingsSelection == 1) {
                 appState.cycleDwellTime(1);
+            } else {
+                appState.cycleDisplayTheme(1);
+                // Force one clean page rebuild so no pixels from the previous
+                // palette remain. Normal updates stay partial afterwards.
+                renderedMode = -1;
             }
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {

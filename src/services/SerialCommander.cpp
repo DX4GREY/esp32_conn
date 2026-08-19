@@ -136,6 +136,7 @@ void SerialCommander::printConfig() {
     Serial.println("\n=== RF CONFIGURATION & PARAMETERS ===");
     Serial.println("TX Power Level : " + String(appState.getPowerLevelName()) + " [" + String(appState.getPowerLevelDbmStr()) + "]");
     Serial.println("Dwell Time     : " + String(appState.dwellTimeUs) + " µs (" + String(appState.getDwellTimeName()) + ")");
+    Serial.println("Display Theme  : " + String(appState.getDisplayThemeName()));
     Serial.println("Active Target  : " + String(appState.getJammerTargetName()) + " (" + String(appState.getJammerFreqRangeStr()) + ")");
     Serial.println("Radio PA Mode  : LNA Gain MAX Enabled");
     Serial.println("Data Rate      : 2 Mbps (RF24_2MBPS)");

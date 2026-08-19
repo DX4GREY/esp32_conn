@@ -11,6 +11,9 @@ void AppState::loadSettings() {
     scanProfile = storedProfile <= SCAN_PROFILE_CUSTOM ?
                   static_cast<ScanProfile>(storedProfile) : SCAN_PROFILE_BALANCED;
     customSpectrumSamples = constrain(prefs.getInt("custom", 40), 10, 100);
+    const uint8_t storedTheme = prefs.getUChar("theme", DISPLAY_THEME_CYBER);
+    displayTheme = storedTheme < DISPLAY_THEME_COUNT ?
+                   static_cast<DisplayThemeId>(storedTheme) : DISPLAY_THEME_CYBER;
     prefs.end();
     // Recompute jammer channel range & starting channel for the loaded target
     setJammerTarget(jammerTarget);
@@ -24,5 +27,6 @@ void AppState::saveSettings() {
     prefs.putUChar("target", (uint8_t)jammerTarget);
     prefs.putUChar("profile", static_cast<uint8_t>(scanProfile));
     prefs.putInt("custom", customSpectrumSamples);
+    prefs.putUChar("theme", static_cast<uint8_t>(displayTheme));
     prefs.end();
 }

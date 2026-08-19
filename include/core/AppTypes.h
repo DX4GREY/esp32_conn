@@ -52,6 +52,16 @@ enum ScanProfile {
     SCAN_PROFILE_CUSTOM
 };
 
+enum DisplayThemeId {
+    DISPLAY_THEME_CYBER = 0,
+    DISPLAY_THEME_OCEAN,
+    DISPLAY_THEME_AMBER,
+    DISPLAY_THEME_MATRIX,
+    DISPLAY_THEME_VIOLET,
+    DISPLAY_THEME_ICE,
+    DISPLAY_THEME_COUNT
+};
+
 constexpr int WATERFALL_ROWS = 24;
 constexpr int RF_EVENT_COUNT = 8;
 

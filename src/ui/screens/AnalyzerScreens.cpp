@@ -253,7 +253,7 @@ void DisplayManager::renderSurveyScreen() {
         tft.print(row + 1);
         tft.print("  CH");
         tft.print(ranked[row]);
-        tft.fillRect(57, y, 72, 7, 0x0862);
+        tft.fillRect(57, y, 72, 7, DISPLAY_BAR_TRACK);
         const int width = map(rankedLevel[row], 0, 100, 0, 72);
         if (width > 0) tft.fillRect(57, y, width, 7, getSignalColor(rankedLevel[row]));
         tft.setCursor(132, y);

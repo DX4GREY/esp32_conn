@@ -185,7 +185,7 @@ void DisplayManager::renderJammerScreen() {
     const int radio2Channel = appState.currentJamChannel2;
     if (!jammingStatusValid || previousJamming != appState.jamming) {
         if (appState.jamming) {
-            const uint16_t activeBg = 0x4004;
+            const uint16_t activeBg = DISPLAY_ACTIVE_BG;
             tft.fillRoundRect(5, statusY, 150, 34, 4, activeBg);
             tft.drawRoundRect(5, statusY, 150, 34, 4, SPECTRUM_CRITICAL);
             tft.fillCircle(13, statusY + 9, 3, SPECTRUM_CRITICAL);
@@ -211,7 +211,7 @@ void DisplayManager::renderJammerScreen() {
     if (appState.jamming &&
         (previousJamChannel != radio1Channel ||
          previousJamChannel2 != radio2Channel)) {
-        const uint16_t activeBg = 0x4004;
+        const uint16_t activeBg = DISPLAY_ACTIVE_BG;
         tft.fillRect(9, statusY + 18, 142, 11, activeBg);
         tft.setCursor(10, statusY + 20);
         tft.setTextColor(ST77XX_WHITE, activeBg);
