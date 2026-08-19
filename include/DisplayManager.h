@@ -13,12 +13,14 @@ public:
     void updateUI();
     void requestRedraw();
     void showSplash();
+    void prepareForShutdown();
 
 private:
     Adafruit_ST7735 tft;
     int menuSelection = 0;
     int settingsSelection = 0;
     int statusPage = 0;
+    int powerSelection = 0;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -67,7 +69,9 @@ private:
     void renderChannelInspector();
     void renderSettingsScreen();
     void renderStatusScreen();
+    void renderPowerScreen();
     void renderRebootScreen();
+    void renderShutdownScreen();
 
     // Graphics Helpers
     uint16_t getSignalColor(uint8_t level);

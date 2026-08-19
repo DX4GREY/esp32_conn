@@ -15,7 +15,9 @@ enum AppMode {
     APP_MODE_ANALYZER_CHANNEL,   // Radio Analyzer Mode: Deep Inspection of 1 Channel
     APP_MODE_SETTINGS,           // RF Power & Dwell Time Settings
     APP_MODE_STATUS,             // Device Status Information
-    APP_MODE_REBOOT              // System Reboot / Restart
+    APP_MODE_POWER,              // Restart / shutdown selection
+    APP_MODE_REBOOT,             // System Reboot / Restart
+    APP_MODE_SHUTDOWN            // Deep-sleep software shutdown
 };
 
 enum JammerTarget {

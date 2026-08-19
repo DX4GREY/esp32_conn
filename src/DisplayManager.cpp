@@ -11,7 +11,7 @@ static const char* menuTitles[] = {
     "INSPECT",
     "SETTINGS",
     "STATUS",
-    "REBOOT"
+    "POWER"
 };
 static const int NUM_MENU_ITEMS = 6;
 
@@ -115,6 +115,12 @@ void DisplayManager::init() {
 
 void DisplayManager::requestRedraw() {
     needRedraw = true;
+}
+
+void DisplayManager::prepareForShutdown() {
+    tft.enableDisplay(false);
+    delay(20);
+    tft.enableSleep(true);
 }
 
 // =============================================================================
@@ -812,6 +818,56 @@ void DisplayManager::renderStatusScreen() {
 }
 
 // =============================================================================
+// POWER MENU
+// =============================================================================
+void DisplayManager::renderPowerScreen() {
+    drawModernHeader("POWER OPTIONS", SPECTRUM_HIGH);
+
+    const char* titles[2] = {"RESTART", "SHUTDOWN"};
+    const char* subtitles[2] = {"Reboot firmware", "Enter deep sleep"};
+    for (int item = 0; item < 2; item++) {
+        const int y = 22 + item * 39;
+        const bool selected = powerSelection == item;
+        const uint16_t background = selected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
+        const uint16_t accent = item == 0 ? SPECTRUM_ACCENT : SPECTRUM_CRITICAL;
+        tft.fillRect(10, y, 140, 32, ST77XX_BLACK);
+        tft.fillRoundRect(10, y, 140, 32, 5, background);
+        tft.drawRoundRect(10, y, 140, 32, 5,
+                          selected ? accent : SPECTRUM_BORDER);
+        if (selected) tft.fillRoundRect(13, y + 5, 3, 22, 1, accent);
+        tft.setCursor(22, y + 6);
+        tft.setTextColor(selected ? ST77XX_WHITE : ST77XX_GRAY, background);
+        tft.print(titles[item]);
+        tft.setCursor(22, y + 18);
+        tft.setTextColor(selected ? accent : ST77XX_GRAY, background);
+        tft.print(subtitles[item]);
+    }
+
+    drawModernFooter("U/D SEL", "R OK", "B BACK");
+}
+
+void DisplayManager::renderShutdownScreen() {
+    if (!needRedraw) return;
+
+    drawModernHeader("POWER OFF", SPECTRUM_CRITICAL);
+    tft.fillRoundRect(14, 23, 132, 75, 7, SPECTRUM_CARD_BG);
+    tft.drawRoundRect(14, 23, 132, 75, 7, SPECTRUM_BORDER);
+    tft.drawCircle(80, 44, 10, SPECTRUM_CRITICAL);
+    tft.fillRect(78, 30, 5, 14, SPECTRUM_CARD_BG);
+    tft.drawFastVLine(80, 29, 14, SPECTRUM_CRITICAL);
+    tft.setCursor(47, 62);
+    tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+    tft.print("SHUTTING DOWN");
+    tft.setCursor(29, 78);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("Hold RIGHT to wake");
+    tft.setCursor(45, 110);
+    tft.setTextColor(SPECTRUM_ACCENT, ST77XX_BLACK);
+    tft.print("DEEP SLEEP");
+    needRedraw = false;
+}
+
+// =============================================================================
 // RENDER REBOOT SCREEN (SYSTEM RESTART)
 // =============================================================================
 void DisplayManager::renderRebootScreen() {
@@ -899,8 +955,17 @@ void DisplayManager::updateUI() {
                 needRedraw = false;
             }
             break;
+        case APP_MODE_POWER:
+            if (needRedraw) {
+                renderPowerScreen();
+                needRedraw = false;
+            }
+            break;
         case APP_MODE_REBOOT:
             renderRebootScreen();   // di-render tiap frame agar animasi titik hidup
+            break;
+        case APP_MODE_SHUTDOWN:
+            renderShutdownScreen();
             break;
     }
 }
@@ -937,9 +1002,9 @@ void DisplayManager::processInput() {
             } else if (menuSelection == 4) {
                 appState.appMode = APP_MODE_STATUS;
             } else if (menuSelection == 5) {
-                // Reboot System: stop radio then enter reboot mode
+                // Power options always begin from a safe, radio-off state.
                 radioManager.stopAll();
-                appState.appMode = APP_MODE_REBOOT;
+                appState.appMode = APP_MODE_POWER;
             }
             needRedraw = true;
         }
@@ -1046,6 +1111,22 @@ void DisplayManager::processInput() {
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             lastStatusRenderMs = 0;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            appState.appMode = APP_MODE_MENU;
+            needRedraw = true;
+        }
+    }
+    // -------------------------------------------------------------------------
+    // CONDITION 7: POWER OPTIONS
+    // -------------------------------------------------------------------------
+    else if (appState.appMode == APP_MODE_POWER) {
+        if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
+            powerSelection = (powerSelection + 1) % 2;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+            radioManager.stopAll();
+            appState.appMode = powerSelection == 0 ? APP_MODE_REBOOT : APP_MODE_SHUTDOWN;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
             appState.appMode = APP_MODE_MENU;

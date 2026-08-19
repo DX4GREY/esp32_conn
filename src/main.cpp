@@ -14,6 +14,8 @@
  */
 
 #include <Arduino.h>
+#include <esp_sleep.h>
+#include <driver/rtc_io.h>
 #include "Config.h"
 #include "AppState.h"
 #include "Watchdog.h"
@@ -21,6 +23,43 @@
 #include "RadioManager.h"
 #include "DisplayManager.h"
 #include "SerialCommander.h"
+
+static constexpr unsigned long WAKE_HOLD_MS = 1500;
+
+static void configureShutdownWakeSource() {
+    pinMode(BTN_RIGHT, INPUT_PULLUP);
+    rtc_gpio_pulldown_dis(static_cast<gpio_num_t>(BTN_RIGHT));
+    rtc_gpio_pullup_en(static_cast<gpio_num_t>(BTN_RIGHT));
+    esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BTN_RIGHT), 0);
+}
+
+[[noreturn]] static void enterShutdownSleep() {
+    configureShutdownWakeSource();
+    Serial.flush();
+    esp_deep_sleep_start();
+    while (true) delay(1000); // Defensive fallback; deep sleep does not return.
+}
+
+static void validateShutdownWakePress() {
+    if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT0) return;
+
+    pinMode(BTN_RIGHT, INPUT_PULLUP);
+    const unsigned long started = millis();
+    while (digitalRead(BTN_RIGHT) == LOW && millis() - started < WAKE_HOLD_MS) {
+        delay(10);
+    }
+
+    if (millis() - started < WAKE_HOLD_MS) {
+        // A short/noisy press must not fully boot the device.
+        while (digitalRead(BTN_RIGHT) == LOW) delay(10);
+        delay(50);
+        enterShutdownSleep();
+    }
+
+    // Avoid treating the wake gesture as an immediate menu ENTER press.
+    while (digitalRead(BTN_RIGHT) == LOW) delay(10);
+    delay(50);
+}
 
 // Callback to keep buttons & UI responsive during scanning
 void yieldToUI() {
@@ -32,6 +71,9 @@ void yieldToUI() {
 // SETUP
 // =============================================================================
 void setup() {
+    // Deep-sleep wake is accepted only after a deliberate long RIGHT press.
+    validateShutdownWakePress();
+
         // 1. Initialize Serial CLI (115200 Baud)
     serialCommander.init(115200);
 
@@ -84,7 +126,8 @@ void loop() {
         //  eliminating flicker from repeated fillScreen)
         radioManager.inspectChannel(appState.inspectedChannel);
         delay(25);
-    } else if (appState.appMode == APP_MODE_REBOOT) {
+    } else if (appState.appMode == APP_MODE_REBOOT ||
+               appState.appMode == APP_MODE_SHUTDOWN) {
         // Reboot Mode: screen is rendered in updateUI, restart is briefly delayed
         delay(10);
     } else {
@@ -100,6 +143,15 @@ void loop() {
         delay(1200); // give the reboot message time to be visible on screen
         Serial.println("REBOOTING SYSTEM...");
         ESP.restart();
+    }
+
+    if (appState.appMode == APP_MODE_SHUTDOWN) {
+        delay(900); // Keep the shutdown confirmation visible briefly.
+        while (digitalRead(BTN_RIGHT) == LOW) delay(10);
+        delay(50);
+        Serial.println("SYSTEM SHUTDOWN: entering deep sleep...");
+        displayManager.prepareForShutdown();
+        enterShutdownSleep();
     }
 
     // 6. Auto-recovery on Watchdog Timeout
