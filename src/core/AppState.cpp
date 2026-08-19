@@ -175,6 +175,7 @@ bool AppState::setDwellTime(int us) {
 
 const char* AppState::getDwellTimeName() const {
     switch (dwellTimeUs) {
+        case 10:   return "10 us (MAX)";
         case 50:   return "50 us (Ultra Fast)";
         case 100:  return "100 us (Fast)";
         case 200:  return "200 us (Balanced)";
