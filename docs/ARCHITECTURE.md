@@ -2,6 +2,26 @@
 
 This document describes the module boundaries used by RF24 Suite and the expected workflow for extending it. The main rule is that hardware access, application state, UI rendering, and user input must remain separate.
 
+Return to the [documentation index](README.md), or see [Development Guide](DEVELOPMENT.md) for the implementation checklist.
+
+## Runtime overview
+
+```text
+Boot / Core 1
+  wake validation → Serial/NVS/LittleFS → buttons/TFT → radio probe → watchdog
+                                      │
+                                      ▼
+Arduino loop / Core 1                 Optional RF-lab task / Core 0
+  watchdog                            channel schedule
+  Serial commands                     short SPI transaction groups
+  button routing                              │
+  analyzer acquisition ───── radio SPI mutex ─┘
+  dirty-region display updates
+  recorder/settings service
+```
+
+The TFT uses a separate SPI connection and is not protected by the radio mutex. Analyzer scans hold the radio mutex for a sweep, while the optional Core 0 task acquires it around short radio transaction groups. Status probes use bounded waits and fall back to the boot-time availability state if the bus is temporarily busy.
+
 ## Directory layout
 
 ```text
@@ -16,7 +36,7 @@ src/
 ├── config/       Channel tables and static assets
 ├── core/         RF settings, analyzer state, and NVS persistence
 ├── drivers/      Radio lifecycle, RF task, and analyzer acquisition
-├── services/     Serial command and watchdog implementations
+├── services/     Serial, recorder, performance, and watchdog implementations
 ├── ui/           Display core, controller, and feature catalog
 │   └── screens/  Renderers grouped by feature domain
 └── main.cpp      Boot, main-loop scheduling, shutdown, and wake-up
@@ -40,6 +60,22 @@ services          UI controller/screens
 - Drivers may update application state but must not render the display.
 - Screen renderers may read state and driver status, but RF acquisition remains in drivers.
 - `main.cpp` schedules modules; feature-specific rendering does not belong there.
+
+## Main-loop scheduling
+
+`AppModePolicy` decides whether the current screen needs continuous sweeps. Spectrum, Waterfall, Survey, and Events scan continuously. Logging scans only while recording is enabled. Frozen analyzer state suppresses continuous acquisition.
+
+Each loop iteration:
+
+1. records a loop heartbeat and feeds the watchdog;
+2. processes one pending Serial line;
+3. routes button input;
+4. performs the mode-specific acquisition or idle delay;
+5. renders changed display regions and records UI duration;
+6. services buffered session writes and deferred NVS writes;
+7. handles restart, shutdown, and watchdog recovery.
+
+Completed sweeps update all shared analyzer products once: waterfall, occupancy, AVG, MAX, event counters, confidence, cursor peak-follow, USB summary, and optional LittleFS session row.
 
 ## Module responsibilities
 
@@ -76,6 +112,26 @@ services          UI controller/screens
 - `PerformanceMonitor.cpp`: smoothed scan/UI duration, maxima, and loop-rate tracking.
 - `SerialCommander.cpp`: CLI routing and machine-readable/diagnostic output.
 - `Watchdog.cpp`: main-loop liveness monitoring.
+
+## State ownership and lifetime
+
+`AppState` is the shared application model. Its data has three lifetimes:
+
+- high-rate acquisition and histories live only in RAM;
+- compact preferences are validated and deferred to NVS;
+- complete recorded sweeps are buffered to LittleFS.
+
+The Core 0 lab task reads volatile test state and updates volatile active-channel fields. The Core 1 UI snapshots those fields before deriving displayed frequencies so a channel/frequency pair remains internally consistent.
+
+## Radio lifecycle
+
+`RadioManager` owns both RF24 objects and never exposes mutable references. Boot creates one mutex for their shared bus, probes each module independently, and enters receive mode in the default build. A missing module is retried while an already discovered module is retained. No-radio boot returns control to the application for diagnostics.
+
+Transitions between transmit, receive, stopped, and powered-down states stay inside the driver. Any new code that accesses an RF24 object must follow the concurrency rules in [Development Guide](DEVELOPMENT.md).
+
+## Display lifecycle
+
+`DisplayController` compares the current `AppMode` with the last rendered mode. A mode change clears the screen once, resets dynamic caches, and builds the new layout. Within the same mode, renderers update only dirty cards, fields, or graph columns. Theme changes intentionally force one clean rebuild so colors from the previous palette cannot remain.
 
 ## Adding a new display feature
 
@@ -135,3 +191,5 @@ Before testing on hardware, also verify:
 - RF Test stops before entering receive-based tools.
 - NVS settings survive restart.
 - Shutdown returns to deep sleep after a short wake press and boots after a long press.
+
+The full automated, hardware, and release matrices are in [Testing and Release](TESTING.md).

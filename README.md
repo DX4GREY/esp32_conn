@@ -350,6 +350,10 @@ Core 0                          Core 1 / Arduino loop
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and the feature-extension checklist.
 
+## Detailed documentation
+
+The complete manual is indexed in [docs/README.md](docs/README.md). It includes getting started, hardware, every display control, analyzer interpretation, session formats, Serial commands, persistence, development rules, testing, troubleshooting, and RF-lab safety.
+
 ## Project structure
 
 | Path | Purpose |
