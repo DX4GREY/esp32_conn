@@ -6,12 +6,12 @@
 DisplayManager displayManager;
 
 static const char* menuTitles[] = {
-    "1. Jammer Control",
-    "2. Spectrum Analyzer",
-    "3. Channel Inspector",
-    "4. RF Power & Dwell",
-    "5. Device Status",
-    "6. Reboot System"
+    "RF TEST",
+    "SPECTRUM",
+    "INSPECT",
+    "SETTINGS",
+    "STATUS",
+    "REBOOT"
 };
 static const int NUM_MENU_ITEMS = 6;
 
@@ -35,6 +35,36 @@ static const char* compactBandName(AnalyzerBand band) {
     }
 }
 
+static String formatBytesShort(uint32_t bytes) {
+    if (bytes >= 1024UL * 1024UL) {
+        const uint32_t whole = bytes / (1024UL * 1024UL);
+        const uint32_t decimal = ((bytes % (1024UL * 1024UL)) * 10UL) /
+                                 (1024UL * 1024UL);
+        return String(whole) + "." + String(decimal) + " MB";
+    }
+    if (bytes >= 1024UL) return String(bytes / 1024UL) + " KB";
+    return String(bytes) + " B";
+}
+
+static String formatUptime(unsigned long uptimeMs) {
+    unsigned long seconds = uptimeMs / 1000UL;
+    const unsigned long days = seconds / 86400UL;
+    seconds %= 86400UL;
+    const unsigned long hours = seconds / 3600UL;
+    seconds %= 3600UL;
+    const unsigned long minutes = seconds / 60UL;
+    seconds %= 60UL;
+
+    char text[20];
+    if (days > 0) {
+        snprintf(text, sizeof(text), "%lud %02lu:%02lu:%02lu",
+                 days, hours, minutes, seconds);
+    } else {
+        snprintf(text, sizeof(text), "%02lu:%02lu:%02lu", hours, minutes, seconds);
+    }
+    return String(text);
+}
+
 DisplayManager::DisplayManager()
     : tft(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST) {
     resetDynamicCaches();
@@ -53,6 +83,7 @@ void DisplayManager::resetDynamicCaches() {
     lastSpectrumRenderMs = 0;
     lastInspectorRenderMs = 0;
     lastJammerRenderMs = 0;
+    lastStatusRenderMs = 0;
     jammerLayoutDrawn = false;
     settingsLayoutDrawn = false;
     previousJammerTarget = -1;
@@ -61,6 +92,11 @@ void DisplayManager::resetDynamicCaches() {
     previousDwellTimeUs = -1;
     previousSettingsSelection = -1;
     jammingStatusValid = false;
+    renderedStatusPage = -1;
+    for (int i = 0; i < 6; i++) {
+        previousStatusValues[i] = "";
+        previousStatusColors[i] = 0;
+    }
 }
 
 static int16_t centeredTextX(const String& text, uint8_t textSize = 1, int16_t screenWidth = 160) {
@@ -166,21 +202,74 @@ void DisplayManager::drawModernFooter(const char* left, const char* middle, cons
 // =============================================================================
 // MENU ITEM HELPER (single row renderer)
 // =============================================================================
-void DisplayManager::drawMenuItem(int index, bool selected) {
-    int y = 16 + (index * 15);
-
-    tft.fillRect(4, y - 1, 152, 13, ST77XX_BLACK);
-
-    if (selected) {
-        tft.fillRoundRect(4, y - 1, 152, 13, 3, SPECTRUM_CARD_BG);
-        tft.drawRoundRect(4, y - 1, 152, 13, 3, SPECTRUM_BORDER);
-        tft.fillRoundRect(7, y + 2, 3, 7, 1, SPECTRUM_ACCENT);
-        tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
-        tft.setCursor(14, y + 2);
-    } else {
-        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-        tft.setCursor(14, y + 2);
+void DisplayManager::drawMenuIcon(int index, int centerX, int centerY,
+                                  uint16_t color, uint16_t background) {
+    switch (index) {
+        case 0: // RF antenna
+            tft.drawFastVLine(centerX, centerY - 4, 10, color);
+            tft.fillCircle(centerX, centerY - 5, 2, color);
+            tft.drawLine(centerX - 3, centerY + 5, centerX + 3, centerY + 5, color);
+            tft.drawLine(centerX - 5, centerY - 3, centerX - 8, centerY, color);
+            tft.drawLine(centerX + 5, centerY - 3, centerX + 8, centerY, color);
+            break;
+        case 1: // Spectrum bars
+            tft.drawFastVLine(centerX - 7, centerY + 1, 5, color);
+            tft.drawFastVLine(centerX - 3, centerY - 3, 9, color);
+            tft.drawFastVLine(centerX + 1, centerY - 6, 12, color);
+            tft.drawFastVLine(centerX + 5, centerY - 1, 7, color);
+            tft.drawFastHLine(centerX - 9, centerY + 6, 18, color);
+            break;
+        case 2: // Magnifier
+            tft.drawCircle(centerX - 2, centerY - 2, 6, color);
+            tft.drawLine(centerX + 3, centerY + 3, centerX + 8, centerY + 8, color);
+            tft.fillCircle(centerX - 2, centerY - 2, 1, color);
+            break;
+        case 3: // Sliders
+            tft.drawFastHLine(centerX - 9, centerY - 5, 18, color);
+            tft.drawFastHLine(centerX - 9, centerY, 18, color);
+            tft.drawFastHLine(centerX - 9, centerY + 5, 18, color);
+            tft.fillCircle(centerX - 3, centerY - 5, 2, background);
+            tft.drawCircle(centerX - 3, centerY - 5, 2, color);
+            tft.fillCircle(centerX + 4, centerY, 2, background);
+            tft.drawCircle(centerX + 4, centerY, 2, color);
+            tft.fillCircle(centerX, centerY + 5, 2, background);
+            tft.drawCircle(centerX, centerY + 5, 2, color);
+            break;
+        case 4: // Device status
+            tft.drawRoundRect(centerX - 8, centerY - 7, 16, 14, 3, color);
+            tft.fillCircle(centerX, centerY - 3, 1, color);
+            tft.drawFastVLine(centerX, centerY, 4, color);
+            break;
+        case 5: // Power/reboot
+            tft.drawCircle(centerX, centerY, 7, color);
+            tft.fillRect(centerX - 2, centerY - 8, 5, 7, background);
+            tft.drawFastVLine(centerX, centerY - 8, 9, color);
+            break;
     }
+}
+
+void DisplayManager::drawMenuItem(int index, bool selected) {
+    constexpr int cardWidth = 74;
+    constexpr int cardHeight = 27;
+    const int column = index % 2;
+    const int row = index / 2;
+    const int x = 4 + column * 78;
+    const int y = 16 + row * 29;
+    const uint16_t background = selected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
+    const uint16_t border = selected ? SPECTRUM_ACCENT : SPECTRUM_BORDER;
+    const uint16_t iconColor = selected ? SPECTRUM_ACCENT : ST77XX_GRAY;
+
+    // Clear only this card's dirty rectangle before rebuilding it.
+    tft.fillRect(x, y, cardWidth, cardHeight, ST77XX_BLACK);
+    tft.fillRoundRect(x, y, cardWidth, cardHeight, 4, background);
+    tft.drawRoundRect(x, y, cardWidth, cardHeight, 4, border);
+    if (selected) tft.fillRoundRect(x + 2, y + 5, 3, 17, 1, SPECTRUM_ACCENT);
+
+    drawMenuIcon(index, x + cardWidth / 2, y + 8, iconColor, background);
+
+    const int labelX = x + (cardWidth - static_cast<int>(strlen(menuTitles[index])) * 6) / 2;
+    tft.setCursor(labelX, y + 17);
+    tft.setTextColor(selected ? ST77XX_WHITE : ST77XX_GRAY, background);
     tft.print(menuTitles[index]);
 }
 
@@ -198,14 +287,14 @@ void DisplayManager::redrawMenuItems(int oldSel, int newSel) {
 // RENDER MAIN MENU (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderMainMenu() {
-    drawModernHeader("RF24 CONTROL", SPECTRUM_ACCENT);
+    drawModernHeader("RF24 TOOLKIT", SPECTRUM_ACCENT);
 
-    // Menu List (Spacing 18px)
+    // Six compact feature cards in a 2 x 3 grid.
     for (int i = 0; i < NUM_MENU_ITEMS; i++) {
         drawMenuItem(i, i == menuSelection);
     }
 
-    drawModernFooter("U/D SEL", "", "R OPEN");
+    drawModernFooter("U/D MOVE", "", "R OPEN");
 }
 
 // =============================================================================
@@ -638,53 +727,88 @@ void DisplayManager::renderSettingsScreen() {
 // RENDER STATUS SCREEN (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderStatusScreen() {
-    drawModernHeader("SYSTEM STATUS", SPECTRUM_LOW);
-    tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
-    tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
+    static const char* pageTitles[] = {"DEVICE INFO", "MEMORY INFO", "RADIO / SW"};
+    const char* labels[6];
+    String values[6];
+    uint16_t colors[6] = {
+        ST77XX_WHITE, ST77XX_WHITE, ST77XX_WHITE,
+        ST77XX_WHITE, ST77XX_WHITE, ST77XX_WHITE
+    };
 
-    tft.setCursor(12, 22);
-    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("RADIO");
-    if (radioManager.isConnected()) {
-        tft.fillCircle(91, 25, 3, SPECTRUM_LOW);
-        tft.setTextColor(SPECTRUM_LOW, SPECTRUM_CARD_BG);
-        tft.setCursor(99, 22);
-        tft.println("CONNECTED");
+    if (statusPage == 0) {
+        labels[0] = "CHIP";      values[0] = String(ESP.getChipModel());
+        labels[1] = "REV/CORE";  values[1] = "r" + String(ESP.getChipRevision()) + " / " +
+                                              String(ESP.getChipCores()) + " cores";
+        labels[2] = "CPU";       values[2] = String(ESP.getCpuFreqMHz()) + " MHz";
+        labels[3] = "FLASH";     values[3] = formatBytesShort(ESP.getFlashChipSize());
+        labels[4] = "FLASH CLK"; values[4] = String(ESP.getFlashChipSpeed() / 1000000UL) + " MHz";
+        labels[5] = "UPTIME";    values[5] = formatUptime(millis());
+        colors[0] = SPECTRUM_ACCENT;
+        colors[5] = SPECTRUM_LOW;
+    } else if (statusPage == 1) {
+        labels[0] = "HEAP TOTAL"; values[0] = formatBytesShort(ESP.getHeapSize());
+        labels[1] = "HEAP FREE";  values[1] = formatBytesShort(ESP.getFreeHeap());
+        labels[2] = "HEAP MIN";   values[2] = formatBytesShort(ESP.getMinFreeHeap());
+        labels[3] = "MAX BLOCK";  values[3] = formatBytesShort(ESP.getMaxAllocHeap());
+        labels[4] = "SKETCH";     values[4] = formatBytesShort(ESP.getSketchSize()) + " used";
+        const uint32_t psramTotal = ESP.getPsramSize();
+        labels[5] = "PSRAM";
+        values[5] = psramTotal == 0 ? String("NOT PRESENT") :
+                    formatBytesShort(ESP.getFreePsram()) + " free";
+        colors[1] = SPECTRUM_LOW;
+        colors[2] = SPECTRUM_HIGH;
+        colors[5] = psramTotal == 0 ? ST77XX_GRAY : SPECTRUM_LOW;
     } else {
-        tft.fillCircle(91, 25, 3, SPECTRUM_CRITICAL);
-        tft.setTextColor(SPECTRUM_CRITICAL, SPECTRUM_CARD_BG);
-        tft.setCursor(99, 22);
-        tft.println("NOT FOUND");
+        const bool radio1Ok = radioManager.isRadio1Connected();
+        const bool radio2Ok = radioManager.isRadio2Connected();
+        labels[0] = "RADIO 1";   values[0] = radio1Ok ? "CONNECTED" : "NOT FOUND";
+        labels[1] = "RADIO 2";   values[1] = radio2Ok ? "CONNECTED" : "NOT FOUND";
+        labels[2] = "SCAN MODE"; values[2] = appState.getAnalyzerRadioModeName();
+        labels[3] = "RF POWER";  values[3] = appState.getPowerLevelName();
+        labels[4] = "ESP-IDF";   values[4] = ESP.getSdkVersion();
+        labels[5] = "BUILD";     values[5] = __DATE__;
+        colors[0] = radio1Ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
+        colors[1] = radio2Ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
+        colors[2] = SPECTRUM_ACCENT;
+        colors[3] = SPECTRUM_HIGH;
     }
-    tft.drawFastHLine(11, 33, 138, SPECTRUM_GRID);
 
-    tft.setCursor(12, 39);
-    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("MCU / CLOCK");
-    tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
-    tft.setCursor(96, 39);
-    tft.print("S3 240M");
+    const bool layoutChanged = renderedStatusPage != statusPage;
+    if (layoutChanged) {
+        drawModernHeader(pageTitles[statusPage], SPECTRUM_LOW);
+        tft.fillRoundRect(137, 2, 20, 10, 3, SPECTRUM_BORDER);
+        tft.setCursor(139, 3);
+        tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_BORDER);
+        tft.print(statusPage + 1);
+        tft.print("/3");
+        tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
+        drawModernFooter("U/D PAGE", "R REF", "B BACK");
+        for (int row = 0; row < 6; row++) previousStatusValues[row] = "";
+    }
 
-    tft.setCursor(12, 55);
-    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("MEMORY        ");
-    tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
-    tft.print("320 KB");
+    for (int row = 0; row < 6; row++) {
+        const int y = 21 + row * 13;
+        if (layoutChanged) {
+            if (row > 0) tft.drawFastHLine(11, y - 3, 138, SPECTRUM_GRID);
+            tft.setCursor(11, y);
+            tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+            tft.print(labels[row]);
+        }
+        if (layoutChanged || previousStatusValues[row] != values[row] ||
+            previousStatusColors[row] != colors[row]) {
+            tft.fillRect(76, y, 73, 8, SPECTRUM_CARD_BG);
+            const int valueX = max(77, 149 - static_cast<int>(values[row].length()) * 6);
+            tft.setCursor(valueX, y);
+            tft.setTextColor(colors[row], SPECTRUM_CARD_BG);
+            tft.print(values[row]);
+            previousStatusValues[row] = values[row];
+            previousStatusColors[row] = colors[row];
+        }
+    }
 
-    tft.setCursor(12, 71);
-    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("WATCHDOG      ");
-    tft.setTextColor(SPECTRUM_LOW, SPECTRUM_CARD_BG);
-    tft.print("3.0s READY");
-
-    tft.setCursor(12, 87);
-    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("RF CONFIG     ");
-    tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
-    tft.print(appState.dwellTimeUs);
-    tft.print(" us");
-
-    drawModernFooter("", "", "B BACK");
+    renderedStatusPage = statusPage;
+    lastStatusRenderMs = millis();
 }
 
 // =============================================================================
@@ -769,7 +893,8 @@ void DisplayManager::updateUI() {
             }
             break;
         case APP_MODE_STATUS:
-            if (needRedraw) {
+            if (needRedraw || lastStatusRenderMs == 0 ||
+                millis() - lastStatusRenderMs >= 1000) {
                 renderStatusScreen();
                 needRedraw = false;
             }
@@ -913,7 +1038,16 @@ void DisplayManager::processInput() {
     // CONDITION 6: STATUS
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_STATUS) {
-        if (buttonManager.isPressed(BTN_B) || buttonManager.isPressed(BTN_RIGHT)) {
+        if (buttonManager.isPressed(BTN_UP)) {
+            statusPage = (statusPage + 2) % 3;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            statusPage = (statusPage + 1) % 3;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+            lastStatusRenderMs = 0;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
             appState.appMode = APP_MODE_MENU;
             needRedraw = true;
         }

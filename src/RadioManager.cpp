@@ -267,7 +267,15 @@ void RadioManager::updatePALevel(rf24_pa_dbm_e pwr) {
 }
 
 bool RadioManager::isConnected() {
-    return radio.isChipConnected() && radio2.isChipConnected();
+    return isRadio1Connected() && isRadio2Connected();
+}
+
+bool RadioManager::isRadio1Connected() {
+    return radio.isChipConnected();
+}
+
+bool RadioManager::isRadio2Connected() {
+    return radio2.isChipConnected();
 }
 
 // =============================================================================

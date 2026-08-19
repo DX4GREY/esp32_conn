@@ -24,6 +24,8 @@ public:
     void stopAll();
     void updatePALevel(rf24_pa_dbm_e pwr);
     bool isConnected();
+    bool isRadio1Connected();
+    bool isRadio2Connected();
     RF24& getRadio() { return radio; }
 
 private:

@@ -18,6 +18,7 @@ private:
     Adafruit_ST7735 tft;
     int menuSelection = 0;
     int settingsSelection = 0;
+    int statusPage = 0;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -41,6 +42,7 @@ private:
     unsigned long lastSpectrumRenderMs = 0;
     unsigned long lastInspectorRenderMs = 0;
     unsigned long lastJammerRenderMs = 0;
+    unsigned long lastStatusRenderMs = 0;
 
     // Tracks page transitions separately from content changes. A full clear is
     // only needed when a different page replaces the current layout.
@@ -54,6 +56,9 @@ private:
     int previousSettingsSelection = -1;
     bool previousJamming = false;
     bool jammingStatusValid = false;
+    int renderedStatusPage = -1;
+    String previousStatusValues[6];
+    uint16_t previousStatusColors[6] = {0, 0, 0, 0, 0, 0};
 
     // Screen Renderers
     void renderMainMenu();
@@ -69,6 +74,7 @@ private:
     void drawSpectrumGrid();
     void drawSpectrumBars();
     void drawMenuItem(int index, bool selected);
+    void drawMenuIcon(int index, int centerX, int centerY, uint16_t color, uint16_t background);
     void redrawMenuItems(int oldSel, int newSel);
     void resetDynamicCaches();
     void drawModernHeader(const char* title, uint16_t accent);
