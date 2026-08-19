@@ -15,6 +15,26 @@ static const char* menuTitles[] = {
 };
 static const int NUM_MENU_ITEMS = 6;
 
+// Shared modern UI palette (RGB565).
+static constexpr uint16_t SPECTRUM_HEADER_BG = 0x0862;
+static constexpr uint16_t SPECTRUM_CARD_BG   = 0x0021;
+static constexpr uint16_t SPECTRUM_BORDER    = 0x1ACB;
+static constexpr uint16_t SPECTRUM_GRID      = 0x10E4;
+static constexpr uint16_t SPECTRUM_ACCENT    = 0x05FF;
+static constexpr uint16_t SPECTRUM_LOW       = 0x05F4;
+static constexpr uint16_t SPECTRUM_MID       = 0xBFE0;
+static constexpr uint16_t SPECTRUM_HIGH      = 0xFD20;
+static constexpr uint16_t SPECTRUM_CRITICAL  = 0xF94F;
+
+static const char* compactBandName(AnalyzerBand band) {
+    switch (band) {
+        case SCAN_BAND_WIFI: return "WIFI";
+        case SCAN_BAND_BT:   return "BT";
+        case SCAN_BAND_ALL:
+        default:             return "ALL";
+    }
+}
+
 DisplayManager::DisplayManager()
     : tft(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST) {
     resetDynamicCaches();
@@ -65,17 +85,21 @@ void DisplayManager::requestRedraw() {
 void DisplayManager::showSplash() {
     tft.fillScreen(ST77XX_BLACK);
 
-    // Title "RF24 SUITE" (textSize 1, centered)
+    tft.fillRoundRect(45, 28, 70, 70, 6, SPECTRUM_CARD_BG);
+    tft.drawRoundRect(45, 28, 70, 70, 6, SPECTRUM_BORDER);
+
     String title = "RF24 SUITE";
     int16_t titleX = centeredTextX(title, 1);
-    tft.setCursor(titleX, 20);
+    tft.setCursor(titleX, 10);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     tft.print(title);
+    tft.drawFastHLine(54, 21, 52, SPECTRUM_ACCENT);
 
     // Draw logo from byte array (centered)
     int logoWidth = 64;
     int logoHeight = 64;
     int logoX = (160 - logoWidth) / 2;
-    int logoY = (128 - logoHeight) / 2;
+    int logoY = 31;
     // splashLogo is an RGB888 bitmap stored as 32-bit unsigned long in PROGMEM
     // (64x64 pixels, one pixel per unsigned long with format 0x00RRGGBB).
     // Adafruit_GFX::drawBitmap() expects 1-bit uint8_t data, and drawRGBBitmap()
@@ -96,7 +120,8 @@ void DisplayManager::showSplash() {
     // Subtitle "by Dx4Grey" (textSize 1, centered below the splashLogo)
     String subtitle = "by Dx4Grey";
     int16_t subtitleX = centeredTextX(subtitle, 1);
-    tft.setCursor(subtitleX, logoY + logoHeight + 4);
+    tft.setTextColor(SPECTRUM_ACCENT, ST77XX_BLACK);
+    tft.setCursor(subtitleX, 106);
     tft.print(subtitle);
 
     // Keep the splash visible for a moment before the menu appears
@@ -110,24 +135,49 @@ uint16_t DisplayManager::getSignalColor(uint8_t level) {
     return ST77XX_RED;
 }
 
+void DisplayManager::drawModernHeader(const char* title, uint16_t accent) {
+    tft.fillRect(0, 0, 160, 14, SPECTRUM_HEADER_BG);
+    tft.drawFastHLine(0, 13, 160, accent);
+    tft.fillCircle(7, 7, 3, accent);
+    tft.drawCircle(7, 7, 5, SPECTRUM_BORDER);
+    tft.setTextSize(1);
+    tft.setTextColor(ST77XX_WHITE, SPECTRUM_HEADER_BG);
+    tft.setCursor(centeredTextX(String(title)), 3);
+    tft.print(title);
+}
+
+void DisplayManager::drawFooterChip(int x, int width, const char* label) {
+    tft.fillRoundRect(x, 107, width, 16, 3, 0x10A2);
+    int textX = x + (width - static_cast<int>(strlen(label)) * 6) / 2;
+    tft.setCursor(textX, 111);
+    tft.setTextColor(SPECTRUM_ACCENT, 0x10A2);
+    tft.print(label);
+}
+
+void DisplayManager::drawModernFooter(const char* left, const char* middle, const char* right) {
+    tft.fillRect(0, 105, 160, 23, ST77XX_BLACK);
+    if (left && left[0]) drawFooterChip(3, 48, left);
+    if (middle && middle[0]) drawFooterChip(56, 49, middle);
+    if (right && right[0]) drawFooterChip(110, 47, right);
+}
+
 // =============================================================================
 // MENU ITEM HELPER (single row renderer)
 // =============================================================================
 void DisplayManager::drawMenuItem(int index, bool selected) {
     int y = 16 + (index * 15);
 
-    // Clear any previous state in this row first
-    tft.fillRect(6, y - 2, 148, 14, ST77XX_BLACK);
+    tft.fillRect(4, y - 1, 152, 13, ST77XX_BLACK);
 
     if (selected) {
-        tft.fillRect(6, y - 2, 148, 14, 0x2124); // Highlight box
-        tft.setTextColor(ST77XX_YELLOW, 0x2124);
-        tft.setCursor(10, y + 1);
-        tft.print("> ");
+        tft.fillRoundRect(4, y - 1, 152, 13, 3, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(4, y - 1, 152, 13, 3, SPECTRUM_BORDER);
+        tft.fillRoundRect(7, y + 2, 3, 7, 1, SPECTRUM_ACCENT);
+        tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+        tft.setCursor(14, y + 2);
     } else {
         tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-        tft.setCursor(10, y + 1);
-        tft.print("  ");
+        tft.setCursor(14, y + 2);
     }
     tft.print(menuTitles[index]);
 }
@@ -146,25 +196,14 @@ void DisplayManager::redrawMenuItems(int oldSel, int newSel) {
 // RENDER MAIN MENU (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderMainMenu() {
-    // Header Banner
-    tft.fillRect(0, 0, 160, 14, 0x10A2); // Dark cyan banner
-    String headerText = "==== RF24 SUITE ====";
-    tft.setTextSize(1);
-    int16_t headerWidth = headerText.length() * 6;
-    int16_t headerX = (160 - headerWidth) / 2;
-    tft.setCursor(headerX, 3);
-    tft.setTextColor(ST77XX_CYAN, 0x10A2);
-    tft.println(headerText);
+    drawModernHeader("RF24 CONTROL", SPECTRUM_ACCENT);
 
     // Menu List (Spacing 18px)
     for (int i = 0; i < NUM_MENU_ITEMS; i++) {
         drawMenuItem(i, i == menuSelection);
     }
 
-    // Footer
-    tft.setCursor(8, 110);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("UP/DN:Select | RT:Enter");
+    drawModernFooter("U/D SEL", "", "R OPEN");
 }
 
 // =============================================================================
@@ -172,29 +211,25 @@ void DisplayManager::renderMainMenu() {
 // =============================================================================
 void DisplayManager::renderJammerScreen() {
     if (!jammerLayoutDrawn) {
-        tft.fillRect(0, 0, 160, 14, 0x6000);
-        String headerText = "Jammer Control";
-        tft.setTextSize(1);
-        tft.setCursor(centeredTextX(headerText), 3);
-        tft.setTextColor(ST77XX_WHITE, 0x6000);
-        tft.println(headerText);
-
-        tft.drawRect(6, 17, 148, 34, ST77XX_CYAN);
-        tft.setCursor(4, 110);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("UP/DN:Tgt | RT:Jam | B:Back");
+        drawModernHeader("RF CONTROL", SPECTRUM_HIGH);
+        tft.fillRoundRect(5, 17, 150, 34, 4, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(5, 17, 150, 34, 4, SPECTRUM_BORDER);
+        tft.fillRoundRect(5, 54, 150, 34, 4, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(5, 54, 150, 34, 4, SPECTRUM_BORDER);
+        tft.fillRoundRect(5, 92, 150, 11, 3, SPECTRUM_CARD_BG);
+        drawModernFooter("U/D TGT", "R START", "B BACK");
         jammerLayoutDrawn = true;
     }
 
     if (previousJammerTarget != static_cast<int>(appState.jammerTarget)) {
-        tft.fillRect(7, 18, 146, 32, ST77XX_BLACK);
-        tft.setCursor(10, 20);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("Target: ");
-        tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+        tft.fillRect(8, 20, 144, 27, SPECTRUM_CARD_BG);
+        tft.setCursor(10, 21);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("TARGET  ");
+        tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
         tft.println(appState.getJammerTargetName());
-        tft.setCursor(10, 31);
-        tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+        tft.setCursor(10, 35);
+        tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
         tft.println(appState.getJammerFreqRangeStr());
         previousJammerTarget = static_cast<int>(appState.jammerTarget);
     }
@@ -204,23 +239,26 @@ void DisplayManager::renderJammerScreen() {
     if (!jammingStatusValid || previousJamming != appState.jamming ||
         (appState.jamming && previousJamChannel != appState.currentJamChannel)) {
         if (appState.jamming) {
-            tft.fillRect(6, statusY, 148, 34, ST77XX_RED);
-            tft.drawRect(6, statusY, 148, 34, ST77XX_YELLOW);
-            tft.setCursor(18, statusY + 5);
-            tft.setTextColor(ST77XX_WHITE, ST77XX_RED);
-            tft.print("[ JAMMING ACTIVE! ]");
-            tft.setCursor(14, statusY + 19);
+            const uint16_t activeBg = 0x4004;
+            tft.fillRoundRect(5, statusY, 150, 34, 4, activeBg);
+            tft.drawRoundRect(5, statusY, 150, 34, 4, SPECTRUM_CRITICAL);
+            tft.fillCircle(13, statusY + 9, 3, SPECTRUM_CRITICAL);
+            tft.setCursor(20, statusY + 6);
+            tft.setTextColor(ST77XX_WHITE, activeBg);
+            tft.print("TRANSMIT ACTIVE");
+            tft.setCursor(20, statusY + 20);
             tft.print("Ch: ");
             tft.print(appState.currentJamChannel);
             tft.print(" (");
             tft.print(2400 + appState.currentJamChannel);
             tft.print(" MHz)   ");
         } else {
-            tft.fillRect(6, statusY, 148, 34, 0x2104);
-            tft.drawRect(6, statusY, 148, 34, ST77XX_GRAY);
-            tft.setCursor(44, statusY + 12);
-            tft.setTextColor(ST77XX_GRAY, 0x2104);
-            tft.print("[ STANDBY ]");
+            tft.fillRoundRect(5, statusY, 150, 34, 4, SPECTRUM_CARD_BG);
+            tft.drawRoundRect(5, statusY, 150, 34, 4, SPECTRUM_BORDER);
+            tft.fillCircle(13, statusY + 17, 3, SPECTRUM_LOW);
+            tft.setCursor(22, statusY + 14);
+            tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+            tft.print("READY / STANDBY");
         }
         previousJamming = appState.jamming;
         previousJamChannel = appState.currentJamChannel;
@@ -230,15 +268,15 @@ void DisplayManager::renderJammerScreen() {
     // Power & Dwell Info
     if (previousPowerLevel != static_cast<int>(appState.powerLevel) ||
         previousDwellTimeUs != appState.dwellTimeUs) {
-        tft.fillRect(6, 92, 148, 10, ST77XX_BLACK);
-        tft.setCursor(6, 94);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("RF: ");
-        tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+        tft.fillRoundRect(5, 92, 150, 11, 3, SPECTRUM_CARD_BG);
+        tft.setCursor(9, 94);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("PWR ");
+        tft.setTextColor(SPECTRUM_HIGH, SPECTRUM_CARD_BG);
         tft.print(appState.getPowerLevelName());
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print(" | Dw: ");
-        tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("  DW ");
+        tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
         tft.print(appState.dwellTimeUs);
         tft.print("us");
         previousPowerLevel = static_cast<int>(appState.powerLevel);
@@ -250,36 +288,40 @@ void DisplayManager::renderJammerScreen() {
 // RENDER RADIO SPECTRUM ANALYZER (LIVE RF GRAPH - COMPACT)
 // =============================================================================
 void DisplayManager::drawSpectrumGrid() {
-    // Top Header Status
-    tft.fillRect(0, 0, 76, 12, ST77XX_BLACK);
-    tft.setCursor(2, 2);
-    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-    tft.print("BAND:");
-    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    tft.print(appState.getAnalyzerBandName());
+    // Compact status header with a small signal glyph and band badge.
+    tft.fillRect(0, 0, 160, 14, SPECTRUM_HEADER_BG);
+    tft.drawFastHLine(0, 13, 160, SPECTRUM_ACCENT);
+    tft.drawFastVLine(4, 8, 3, SPECTRUM_ACCENT);
+    tft.drawFastVLine(7, 6, 5, SPECTRUM_ACCENT);
+    tft.drawFastVLine(10, 3, 8, SPECTRUM_ACCENT);
+    tft.setCursor(15, 3);
+    tft.setTextColor(ST77XX_WHITE, SPECTRUM_HEADER_BG);
+    tft.print("SPECTRUM");
 
-    tft.setCursor(78, 2);
-    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-    tft.print("PK:");
-    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    tft.print(appState.peakChannel);
-    tft.print("(");
-    tft.print(appState.peakLevel);
-    tft.print("%)");
+    tft.fillRoundRect(66, 2, 31, 10, 3, SPECTRUM_BORDER);
+    const char* band = compactBandName(appState.analyzerBand);
+    int bandX = 66 + (31 - static_cast<int>(strlen(band)) * 6) / 2;
+    tft.setCursor(bandX, 3);
+    tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_BORDER);
+    tft.print(band);
 
-    // Y-axis Grid Level Lines (100%, 50%, Baseline 0%)
-    tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_TOP, GRAPH_WIDTH, ST77XX_DARKGRAY);
-    tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2), GRAPH_WIDTH, ST77XX_DARKGRAY);
-    tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_BASELINE, GRAPH_WIDTH, ST77XX_WHITE); // X baseline
+    // Chart card and dotted horizontal guides.
+    tft.fillRect(16, 15, 130, 67, SPECTRUM_CARD_BG);
+    tft.drawRect(16, 15, 130, 67, SPECTRUM_BORDER);
+    for (int x = GRAPH_X_START; x < GRAPH_X_START + GRAPH_WIDTH; x += 4) {
+        tft.drawPixel(x, GRAPH_Y_TOP, SPECTRUM_GRID);
+        tft.drawPixel(x, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2), SPECTRUM_GRID);
+    }
+    tft.drawFastHLine(GRAPH_X_START, GRAPH_Y_BASELINE, GRAPH_WIDTH, SPECTRUM_BORDER);
 
-    // Y-axis Labels (0, 50, 100)
-    tft.setCursor(0, GRAPH_Y_TOP);
+    // Minimal Y-axis labels leave more room for the actual signal plot.
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+    tft.setCursor(0, GRAPH_Y_TOP - 2);
     tft.print("100");
-    tft.setCursor(2, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2) - 3);
+    tft.setCursor(3, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2) - 3);
     tft.print("50");
-    tft.setCursor(6, GRAPH_Y_BASELINE - 4);
-    tft.print(" 0");
+    tft.setCursor(9, GRAPH_Y_BASELINE - 5);
+    tft.print("0");
 
     // X-axis: Popular Wi-Fi Channel Markers (1, 6, 11, 14)
     const int wifiMarkers[4] = {12, 37, 62, 84};
@@ -287,32 +329,28 @@ void DisplayManager::drawSpectrumGrid() {
 
     for (int i = 0; i < 4; i++) {
         int markerX = GRAPH_X_START + wifiMarkers[i];
-        tft.drawFastVLine(markerX, GRAPH_Y_BASELINE + 1, 2, ST77XX_CYAN);
+        tft.drawFastVLine(markerX, GRAPH_Y_BASELINE + 1, 3, SPECTRUM_ACCENT);
         tft.setCursor(markerX - 2, GRAPH_Y_BASELINE + 4);
-        tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+        tft.setTextColor(SPECTRUM_ACCENT, ST77XX_BLACK);
         tft.print(wifiLabels[i]);
     }
 
-    tft.setCursor(114, GRAPH_Y_BASELINE + 4);
+    tft.setCursor(135, GRAPH_Y_BASELINE + 4);
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("2.4G");
+    tft.print("GHz");
 
-    // Footer
-    tft.setCursor(4, 110);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("UP:Band  RT:Rst  B:Menu");
+    drawModernFooter("U BAND", "R RESET", "B BACK");
 }
 
 void DisplayManager::drawSpectrumBars() {
     // Header is redrawn only when its displayed value changes.
     if (previousHeaderPeakChannel != appState.peakChannel ||
         previousHeaderPeakLevel != appState.peakLevel) {
-        tft.fillRect(76, 0, 84, 12, ST77XX_BLACK);
-        tft.setCursor(78, 2);
-        tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-        tft.print("PK:");
-        tft.setTextColor(getSignalColor(appState.peakLevel), ST77XX_BLACK);
-        tft.print("Ch");
+        tft.fillRect(99, 1, 61, 11, SPECTRUM_HEADER_BG);
+        tft.setCursor(99, 3);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_HEADER_BG);
+        tft.print("P ");
+        tft.setTextColor(getSignalColor(appState.peakLevel), SPECTRUM_HEADER_BG);
         tft.print(appState.peakChannel);
         tft.print(" ");
         tft.print(appState.peakLevel);
@@ -334,21 +372,45 @@ void DisplayManager::drawSpectrumBars() {
         int barHeight = (lvl * GRAPH_HEIGHT) / 100;
         int peakHeight = (peak * GRAPH_HEIGHT) / 100;
 
-        int barTop = GRAPH_Y_BASELINE - barHeight;
         int peakTop = GRAPH_Y_BASELINE - peakHeight;
 
-        // Clear just this dirty column, then restore grid pixels that cross it.
-        tft.writeFastVLine(x, GRAPH_Y_TOP, GRAPH_HEIGHT + 1, ST77XX_BLACK);
-        tft.writePixel(x, GRAPH_Y_TOP, ST77XX_DARKGRAY);
-        tft.writePixel(x, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2), ST77XX_DARKGRAY);
-        tft.writePixel(x, GRAPH_Y_BASELINE, ST77XX_WHITE);
-
-        if (peakHeight > 0 && peakTop >= GRAPH_Y_TOP) {
-            tft.writePixel(x, peakTop, ST77XX_CYAN);
+        // Clear only this dirty column and restore the card's dotted guides.
+        tft.writeFastVLine(x, GRAPH_Y_TOP, GRAPH_HEIGHT + 1, SPECTRUM_CARD_BG);
+        if ((ch % 4) == 0) {
+            tft.writePixel(x, GRAPH_Y_TOP, SPECTRUM_GRID);
+            tft.writePixel(x, GRAPH_Y_TOP + (GRAPH_HEIGHT / 2), SPECTRUM_GRID);
         }
+        tft.writePixel(x, GRAPH_Y_BASELINE, SPECTRUM_BORDER);
 
         if (barHeight > 0) {
-            tft.writeFastVLine(x, barTop, barHeight, getSignalColor(lvl));
+            // A four-zone vertical gradient makes intensity readable without
+            // requiring wider bars or a costly full-frame canvas.
+            int remaining = barHeight;
+            int cursorY = GRAPH_Y_BASELINE;
+            int segment = min(remaining, (GRAPH_HEIGHT * 30) / 100);
+            cursorY -= segment;
+            tft.writeFastVLine(x, cursorY, segment, SPECTRUM_LOW);
+            remaining -= segment;
+
+            segment = min(remaining, (GRAPH_HEIGHT * 35) / 100);
+            cursorY -= segment;
+            if (segment > 0) tft.writeFastVLine(x, cursorY, segment, SPECTRUM_MID);
+            remaining -= segment;
+
+            segment = min(remaining, (GRAPH_HEIGHT * 20) / 100);
+            cursorY -= segment;
+            if (segment > 0) tft.writeFastVLine(x, cursorY, segment, SPECTRUM_HIGH);
+            remaining -= segment;
+
+            if (remaining > 0) {
+                cursorY -= remaining;
+                tft.writeFastVLine(x, cursorY, remaining, SPECTRUM_CRITICAL);
+            }
+        }
+
+        // Peak marker is drawn last, so it stays visible over the gradient.
+        if (peakHeight > 0 && peakTop >= GRAPH_Y_TOP) {
+            tft.writePixel(x, peakTop, ST77XX_WHITE);
         }
 
         previousSpectrumLevels[ch] = lvl;
@@ -379,36 +441,31 @@ void DisplayManager::renderChannelInspector() {
     // STATIC part: drawn only once (when entering the mode / changing channel)
     // ---------------------------------------------------------------
     if (needRedraw) {
-        // Header Banner
-        tft.fillRect(0, 0, 160, 14, 0x0810);
-        tft.setCursor(24, 3);
-        tft.setTextColor(ST77XX_CYAN, 0x0810);
-        tft.setTextSize(1);
-        String headerText = "CHANNEL INSPECTOR";
-        int16_t headerWidth = headerText.length() * 6;
-        int16_t headerX = (160 - headerWidth) / 2;
-        tft.setCursor(headerX, 3);
-        tft.println(headerText);
+        drawModernHeader("CHANNEL INSPECT", SPECTRUM_ACCENT);
+        tft.fillRoundRect(5, 17, 150, 27, 4, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(5, 17, 150, 27, 4, SPECTRUM_BORDER);
+        tft.fillRoundRect(5, 47, 150, 48, 4, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(5, 47, 150, 48, 4, SPECTRUM_BORDER);
 
         int ch = appState.inspectedChannel;
         int freq = 2400 + ch;
 
         // Channel & Frequency
-        tft.setCursor(8, 18);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("RF Ch: ");
-        tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+        tft.setCursor(10, 20);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("CH ");
+        tft.setTextColor(SPECTRUM_HIGH, SPECTRUM_CARD_BG);
         tft.print(ch);
-        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-        tft.print(" (");
+        tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+        tft.print("  ");
         tft.print(freq);
-        tft.print(" MHz)");
+        tft.print(" MHz");
 
         // Protocol Information Mapping
-        tft.setCursor(8, 30);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("Protocol : ");
-        tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+        tft.setCursor(10, 32);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("BAND  ");
+        tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
         if (ch >= 1 && ch <= 73) {
             tft.print("Wi-Fi Band");
         } else if (ch >= 74 && ch <= 80) {
@@ -417,13 +474,11 @@ void DisplayManager::renderChannelInspector() {
             tft.print("RF Extended");
         }
 
-        // Activity Gauge (Progress Bar - Width 144px)
-        tft.drawRect(8, 44, 144, 16, ST77XX_WHITE);
-
-        // Footer
-        tft.setCursor(4, 110);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("UP/DN:+1 | RT:+10 | B:Menu");
+        tft.setCursor(10, 51);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("LIVE SIGNAL");
+        tft.drawRoundRect(10, 62, 140, 13, 3, SPECTRUM_BORDER);
+        drawModernFooter("U/D +/-", "R +10", "B BACK");
 
         needRedraw = false;
         previousInspectedLevel = 0xFF;
@@ -444,28 +499,28 @@ void DisplayManager::renderChannelInspector() {
     // ---------------------------------------------------------------
     // Clear the gauge area (incl. border), then redraw border + fill
     if (valuesChanged) {
-        // Keep the static border intact; update only its 140x12 interior.
-        tft.fillRect(10, 46, 140, 12, ST77XX_BLACK);
+        // Keep the static border intact; update only its interior.
+        tft.fillRect(12, 64, 136, 9, SPECTRUM_CARD_BG);
 
-        int barW = map(appState.inspectedLevel, 0, 100, 0, 140);
+        int barW = map(appState.inspectedLevel, 0, 100, 0, 136);
         if (barW > 0) {
-            tft.fillRect(10, 46, barW, 12, getSignalColor(appState.inspectedLevel));
+            tft.fillRect(12, 64, barW, 9, getSignalColor(appState.inspectedLevel));
         }
 
-        int peakX = 10 + map(appState.inspectedPeak, 0, 100, 0, 139);
-        tft.drawFastVLine(peakX, 46, 12, ST77XX_CYAN);
+        int peakX = 12 + map(appState.inspectedPeak, 0, 100, 0, 135);
+        tft.drawFastVLine(peakX, 63, 11, ST77XX_WHITE);
 
-        tft.fillRect(8, 64, 150, 8, ST77XX_BLACK);
-        tft.setCursor(8, 64);
-        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-        tft.print("Signal: ");
-        tft.setTextColor(getSignalColor(appState.inspectedLevel), ST77XX_BLACK);
+        tft.fillRect(10, 79, 140, 9, SPECTRUM_CARD_BG);
+        tft.setCursor(10, 80);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("NOW ");
+        tft.setTextColor(getSignalColor(appState.inspectedLevel), SPECTRUM_CARD_BG);
         tft.print(appState.inspectedLevel);
-        tft.print("%  ");
+        tft.print("%   ");
 
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("Peak: ");
-        tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+        tft.print("PEAK ");
+        tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
         tft.print(appState.inspectedPeak);
         tft.print("%");
 
@@ -474,12 +529,11 @@ void DisplayManager::renderChannelInspector() {
     }
 
     if (!carrierStatusValid || previousCarrierDetected != carrierDetected) {
-        tft.fillRect(8, 76, 150, 8, ST77XX_BLACK);
-        tft.setCursor(8, 76);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("Status: ");
-        tft.setTextColor(carrierDetected ? ST77XX_RED : ST77XX_GREEN, ST77XX_BLACK);
-        tft.print(carrierDetected ? "[ RF DETECTED ]" : "[ SIGNAL CLEAR ]");
+        tft.fillRect(10, 88, 140, 6, SPECTRUM_CARD_BG);
+        tft.setCursor(10, 88);
+        tft.setTextColor(carrierDetected ? SPECTRUM_CRITICAL : SPECTRUM_LOW,
+                         SPECTRUM_CARD_BG);
+        tft.print(carrierDetected ? "> RF ACTIVITY" : "> CHANNEL CLEAR");
         previousCarrierDetected = carrierDetected;
         carrierStatusValid = true;
     }
@@ -493,81 +547,54 @@ void DisplayManager::renderChannelInspector() {
 // =============================================================================
 void DisplayManager::renderSettingsScreen() {
     if (!settingsLayoutDrawn) {
-        tft.fillRect(0, 0, 160, 14, 0x18F5);
-        tft.setTextSize(1);
-        String headerText = "RF POWER & DWELL";
-        tft.setCursor(centeredTextX(headerText), 3);
-        tft.setTextColor(ST77XX_WHITE, 0x18F5);
-        tft.println(headerText);
-        tft.setCursor(4, 110);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print("UP/DN:Sel | RT:Next | B:Menu");
+        drawModernHeader("RF SETTINGS", SPECTRUM_HIGH);
+        drawModernFooter("U/D SEL", "R NEXT", "B BACK");
         settingsLayoutDrawn = true;
     }
 
-    // 1. Power Level Box (y = 18 to 56, Height 38px)
     bool pwrSelected = (settingsSelection == 0);
-    uint16_t pwrBorder = pwrSelected ? ST77XX_YELLOW : ST77XX_DARKGRAY;
-    tft.fillRect(6, 18, 148, 38, pwrSelected ? 0x2124 : ST77XX_BLACK);
-    tft.drawRect(6, 18, 148, 38, pwrBorder);
+    uint16_t pwrBg = pwrSelected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
+    tft.fillRect(5, 17, 150, 39, ST77XX_BLACK);
+    tft.fillRoundRect(5, 17, 150, 39, 4, pwrBg);
+    tft.drawRoundRect(5, 17, 150, 39, 4,
+                      pwrSelected ? SPECTRUM_ACCENT : SPECTRUM_BORDER);
+    if (pwrSelected) tft.fillRoundRect(8, 21, 3, 31, 1, SPECTRUM_ACCENT);
 
-    tft.setCursor(10, 22);
-    tft.setTextColor(pwrSelected ? ST77XX_YELLOW : ST77XX_GRAY, pwrSelected ? 0x2124 : ST77XX_BLACK);
-    tft.print(pwrSelected ? "> 1. TX Power Level" : "  1. TX Power Level");
+    tft.setCursor(15, 21);
+    tft.setTextColor(pwrSelected ? SPECTRUM_ACCENT : ST77XX_GRAY, pwrBg);
+    tft.print("TX POWER");
 
-    tft.setCursor(16, 34);
+    tft.setCursor(15, 33);
     uint16_t pwrColor = ST77XX_WHITE;
-    if (appState.powerLevel == RF24_PA_MAX) pwrColor = ST77XX_RED;
-    else if (appState.powerLevel == RF24_PA_HIGH) pwrColor = CUSTOM_ORANGE;
-    else if (appState.powerLevel == RF24_PA_LOW) pwrColor = ST77XX_YELLOW;
-    else pwrColor = ST77XX_GREEN;
-
-    tft.setTextColor(pwrColor, pwrSelected ? 0x2124 : ST77XX_BLACK);
-    tft.print("[ ");
+    if (appState.powerLevel == RF24_PA_MAX) pwrColor = SPECTRUM_CRITICAL;
+    else if (appState.powerLevel == RF24_PA_HIGH) pwrColor = SPECTRUM_HIGH;
+    else if (appState.powerLevel == RF24_PA_LOW) pwrColor = SPECTRUM_MID;
+    else pwrColor = SPECTRUM_LOW;
+    tft.setTextColor(pwrColor, pwrBg);
     tft.print(appState.getPowerLevelName());
-    tft.print(" ]");
+    tft.setCursor(15, 45);
+    tft.setTextColor(ST77XX_GRAY, pwrBg);
+    tft.print("Radio output level");
 
-    tft.setCursor(16, 44);
-    tft.setTextColor(ST77XX_GRAY, pwrSelected ? 0x2124 : ST77XX_BLACK);
-    if (appState.powerLevel == RF24_PA_MAX) {
-        tft.print("Full 0dBm + LNA Boost");
-    } else if (appState.powerLevel == RF24_PA_HIGH) {
-        tft.print("Moderate Jam Range");
-    } else if (appState.powerLevel == RF24_PA_LOW) {
-        tft.print("Close Range Test");
-    } else {
-        tft.print("Low Power Safe Test");
-    }
-
-    // 2. Dwell Time Box (y = 60 to 98, Height 38px)
     bool dwellSelected = (settingsSelection == 1);
-    uint16_t dwellBorder = dwellSelected ? ST77XX_YELLOW : ST77XX_DARKGRAY;
-    tft.fillRect(6, 60, 148, 38, dwellSelected ? 0x2124 : ST77XX_BLACK);
-    tft.drawRect(6, 60, 148, 38, dwellBorder);
+    uint16_t dwellBg = dwellSelected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
+    tft.fillRect(5, 60, 150, 39, ST77XX_BLACK);
+    tft.fillRoundRect(5, 60, 150, 39, 4, dwellBg);
+    tft.drawRoundRect(5, 60, 150, 39, 4,
+                      dwellSelected ? SPECTRUM_ACCENT : SPECTRUM_BORDER);
+    if (dwellSelected) tft.fillRoundRect(8, 64, 3, 31, 1, SPECTRUM_ACCENT);
 
-    tft.setCursor(10, 64);
-    tft.setTextColor(dwellSelected ? ST77XX_YELLOW : ST77XX_GRAY, dwellSelected ? 0x2124 : ST77XX_BLACK);
-    tft.print(dwellSelected ? "> 2. Channel Dwell" : "  2. Channel Dwell");
-
-    tft.setCursor(16, 76);
-    tft.setTextColor(ST77XX_CYAN, dwellSelected ? 0x2124 : ST77XX_BLACK);
-    tft.print("[ ");
+    tft.setCursor(15, 64);
+    tft.setTextColor(dwellSelected ? SPECTRUM_ACCENT : ST77XX_GRAY, dwellBg);
+    tft.print("SAMPLE DWELL");
+    tft.setCursor(15, 76);
+    tft.setTextColor(SPECTRUM_ACCENT, dwellBg);
     tft.print(appState.getDwellTimeName());
-    tft.print(" ]");
-
-    tft.setCursor(16, 86);
-    tft.setTextColor(ST77XX_GRAY, dwellSelected ? 0x2124 : ST77XX_BLACK);
-    if (appState.dwellTimeUs <= 50) {
-        tft.print("Hyper-fast RF cycle");
-    } else if (appState.dwellTimeUs <= 100) {
-        tft.print("Fast sweep repetition");
-    } else if (appState.dwellTimeUs <= 200) {
-        tft.print("Recommended balanced");
-    } else if (appState.dwellTimeUs <= 500) {
-        tft.print("Heavy airtime impact");
-    } else {
-        tft.print("Long dwell blast / ch");
-    }
+    tft.setCursor(15, 88);
+    tft.setTextColor(ST77XX_GRAY, dwellBg);
+    tft.print("Channel timing: ");
+    tft.print(appState.dwellTimeUs);
+    tft.print(" us");
 
     previousSettingsSelection = settingsSelection;
     previousPowerLevel = static_cast<int>(appState.powerLevel);
@@ -578,57 +605,53 @@ void DisplayManager::renderSettingsScreen() {
 // RENDER STATUS SCREEN (COMPACT & FIT)
 // =============================================================================
 void DisplayManager::renderStatusScreen() {
-    // Header Banner
-    tft.fillRect(0, 0, 160, 14, 0x2124);
-    tft.setCursor(34, 3);
-    tft.setTextColor(ST77XX_WHITE, 0x2124);
-    tft.setTextSize(1);
-    tft.println("DEVICE STATUS");
+    drawModernHeader("SYSTEM STATUS", SPECTRUM_LOW);
+    tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
+    tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
 
-    tft.setCursor(8, 20);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Radio nRF24: ");
+    tft.setCursor(12, 22);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("RADIO");
     if (radioManager.isConnected()) {
-        tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
+        tft.fillCircle(91, 25, 3, SPECTRUM_LOW);
+        tft.setTextColor(SPECTRUM_LOW, SPECTRUM_CARD_BG);
+        tft.setCursor(99, 22);
         tft.println("CONNECTED");
     } else {
-        tft.setTextColor(ST77XX_RED, ST77XX_BLACK);
+        tft.fillCircle(91, 25, 3, SPECTRUM_CRITICAL);
+        tft.setTextColor(SPECTRUM_CRITICAL, SPECTRUM_CARD_BG);
+        tft.setCursor(99, 22);
         tft.println("NOT FOUND");
     }
+    tft.drawFastHLine(11, 33, 138, SPECTRUM_GRID);
 
-    tft.setCursor(8, 34);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Chipset    : ");
-    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    tft.println("Xtensa");
+    tft.setCursor(12, 39);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("MCU / CLOCK");
+    tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+    tft.setCursor(96, 39);
+    tft.print("S3 240M");
 
-    tft.setCursor(8, 48);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Clock / RAM: ");
-    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    tft.println("240MHz / 320KB");
+    tft.setCursor(12, 55);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("MEMORY        ");
+    tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+    tft.print("320 KB");
 
-    tft.setCursor(8, 62);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Watchdog   : ");
-    tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
-    tft.println("3.0s Hardware");
+    tft.setCursor(12, 71);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("WATCHDOG      ");
+    tft.setTextColor(SPECTRUM_LOW, SPECTRUM_CARD_BG);
+    tft.print("3.0s READY");
 
-    tft.setCursor(8, 76);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Jammer Pwr : ");
-    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    tft.println(String(appState.getPowerLevelName()));
+    tft.setCursor(12, 87);
+    tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
+    tft.print("RF CONFIG     ");
+    tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_CARD_BG);
+    tft.print(appState.dwellTimeUs);
+    tft.print(" us");
 
-    tft.setCursor(8, 90);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Dwell Time : ");
-    tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-    tft.println(String(appState.dwellTimeUs) + " us");
-
-    tft.setCursor(14, 110);
-    tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-    tft.print("Press B to go back");
+    drawModernFooter("", "", "B BACK");
 }
 
 // =============================================================================
@@ -636,32 +659,20 @@ void DisplayManager::renderStatusScreen() {
 // =============================================================================
 void DisplayManager::renderRebootScreen() {
     if (needRedraw) {
-        // Header Banner
-        tft.fillRect(0, 0, 160, 14, 0x7800); // Maroon (dark red)
-        tft.setCursor(24, 3);
-        tft.setTextColor(ST77XX_WHITE, 0x7800);
-        tft.setTextSize(1);
-        String headerText = "SYSTEM REBOOT";
-        int16_t headerWidth = headerText.length() * 6;
-        int16_t headerX = (160 - headerWidth) / 2;
-        tft.setCursor(headerX, 3);
-        tft.println(headerText);
-
-        // Main Message
-        String mainMessage = "REBOOTING";
-        int16_t mainWidth = mainMessage.length() * 6;
-        int16_t mainX = (160 - mainWidth) / 2;
-        tft.setCursor(mainX, 44);
-        tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-        tft.print(mainMessage);
-
-        tft.setCursor(38, 62);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        drawModernHeader("SYSTEM RESTART", SPECTRUM_CRITICAL);
+        tft.fillRoundRect(18, 25, 124, 70, 7, SPECTRUM_CARD_BG);
+        tft.drawRoundRect(18, 25, 124, 70, 7, SPECTRUM_BORDER);
+        tft.drawCircle(80, 45, 10, SPECTRUM_CRITICAL);
+        tft.drawFastVLine(80, 32, 12, SPECTRUM_CRITICAL);
+        tft.setCursor(47, 62);
+        tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+        tft.print("RESTARTING");
+        tft.setCursor(44, 78);
+        tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
         tft.print("PLEASE WAIT");
-
-        tft.setCursor(8, 100);
-        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-        tft.print("Restarting ESP32...");
+        tft.setCursor(42, 109);
+        tft.setTextColor(SPECTRUM_ACCENT, ST77XX_BLACK);
+        tft.print("RF24 SYSTEM");
 
         needRedraw = false;
     }
@@ -672,9 +683,9 @@ void DisplayManager::renderRebootScreen() {
     }
     int16_t dotProgRebootWidth = dotProgReboot.length() * 6;
     int16_t dotX = (160 - dotProgRebootWidth) / 2;
-    tft.fillRect(0, 44, 160, 8, ST77XX_BLACK);
-    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    tft.setCursor(dotX, 44);
+    tft.fillRect(30, 62, 100, 8, SPECTRUM_CARD_BG);
+    tft.setTextColor(ST77XX_WHITE, SPECTRUM_CARD_BG);
+    tft.setCursor(dotX, 62);
     tft.print(dotProgReboot);
 }
 

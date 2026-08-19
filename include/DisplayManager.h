@@ -69,6 +69,9 @@ private:
     void drawMenuItem(int index, bool selected);
     void redrawMenuItems(int oldSel, int newSel);
     void resetDynamicCaches();
+    void drawModernHeader(const char* title, uint16_t accent);
+    void drawModernFooter(const char* left, const char* middle, const char* right);
+    void drawFooterChip(int x, int width, const char* label);
 };
 
 extern DisplayManager displayManager;
