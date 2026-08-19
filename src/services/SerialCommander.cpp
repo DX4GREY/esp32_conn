@@ -1,7 +1,7 @@
-#include "SerialCommander.h"
-#include "AppState.h"
-#include "RadioManager.h"
-#include "DisplayManager.h"
+#include "services/SerialCommander.h"
+#include "core/AppState.h"
+#include "drivers/RadioManager.h"
+#include "ui/DisplayManager.h"
 
 SerialCommander serialCommander;
 

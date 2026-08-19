@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <RF24.h>
-#include "Config.h"
-#include "AppState.h"
+#include "config/Config.h"
+#include "core/AppState.h"
 
 class RadioManager {
 public:

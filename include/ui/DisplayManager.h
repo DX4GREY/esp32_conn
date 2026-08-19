@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
-#include "Config.h"
-#include "AppState.h"
+#include "config/Config.h"
+#include "core/AppState.h"
 
 class DisplayManager {
 public:

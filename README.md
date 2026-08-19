@@ -291,24 +291,27 @@ Core 0                          Core 1 / Arduino loop
 - `AppState` owns UI, analyzer, event, survey, and NVS state.
 - `RadioManager` controls RX/TX transitions and access to both nRF24 modules.
 - `DisplayManager` implements the menu grid and dirty-region rendering.
+- `MenuCatalog` is the single source of truth for menu labels, destination modes, icons, and open actions.
+- `AppModePolicy` centralizes which screens run continuous spectrum acquisition.
 - `ButtonManager` provides 50 ms debouncing and long-press detection.
 - `SerialCommander` handles the CLI and logging output.
 - `Watchdog` monitors the main loop with a three-second timeout.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and the feature-extension checklist.
 
 ## Project structure
 
 | Path | Purpose |
 |---|---|
 | `platformio.ini` | Board environment, dependencies, flash, and USB CDC settings |
-| `include/Config.h` | Pin assignments, channel data declarations, timing, and constants |
-| `src/Config.cpp` | Channel tables and splash-screen asset definitions |
-| `include/AppState.h`, `src/AppState.cpp` | Application state, profiles, events, survey, and NVS |
-| `include/RadioManager.h`, `src/RadioManager.cpp` | Dual-radio driver, analyzer, and RF Test task |
-| `include/DisplayManager.h`, `src/DisplayManager.cpp` | TFT renderer and UI navigation |
-| `include/ButtonManager.h`, `src/ButtonManager.cpp` | Button input and debouncing |
-| `include/SerialCommander.h`, `src/SerialCommander.cpp` | Serial CLI, status, and ASCII spectrum |
-| `include/Watchdog.h`, `src/Watchdog.cpp` | Hardware watchdog wrapper |
+| `include/config`, `src/config` | Pin assignments, constants, channel tables, and static assets |
+| `include/core`, `src/core` | Shared types, application state, analyzer aggregation, policies, and NVS |
+| `include/drivers`, `src/drivers` | Buttons, dual-radio lifecycle, RF acquisition, and RF Test task |
+| `include/services`, `src/services` | Serial CLI and watchdog |
+| `include/ui`, `src/ui` | Display API, theme, menu catalog, controller, and screen modules |
+| `src/ui/screens` | Renderers grouped into menu, analyzer, and system domains |
 | `src/main.cpp` | Setup, main loop, shutdown, and wake validation |
+| `docs/ARCHITECTURE.md` | Dependency rules and guide for adding features |
 
 ## Troubleshooting
 
@@ -362,6 +365,6 @@ pio run --target clean
 pio run
 ```
 
-Keep pin definitions in `include/Config.h`, avoid full-screen redraws for dynamic updates, and document changes to Serial or NVS formats to preserve user compatibility.
+Keep pin definitions in `include/config/Config.h`, avoid full-screen redraws for dynamic updates, and document changes to Serial or NVS formats to preserve user compatibility.
 
 This repository currently has no separate license file. Add a `LICENSE` before distributing it under specific license terms.

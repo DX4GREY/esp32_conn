@@ -1,71 +1,11 @@
 #pragma once
 #include <Arduino.h>
 #include <RF24.h>
-#include <Preferences.h>
-#include "Config.h"
+#include "config/Config.h"
+#include "core/AppTypes.h"
 
 // =============================================================================
-// ENUMERASI STATE APLIKASI
-// =============================================================================
-
-enum AppMode {
-    APP_MODE_MENU,               // Main Menu
-    APP_MODE_JAMMER,             // Fast Multi-Target Jammer Mode
-    APP_MODE_ANALYZER_SPECTRUM,  // Radio Analyzer Mode: Live RF Spectrum Graph
-    APP_MODE_WATERFALL,          // Spectrum history
-    APP_MODE_ANALYZER_CHANNEL,   // Radio Analyzer Mode: Deep Inspection of 1 Channel
-    APP_MODE_SURVEY,             // Accumulated channel occupancy
-    APP_MODE_EVENTS,             // Detected RF activity events
-    APP_MODE_LOGGING,            // Serial logging control
-    APP_MODE_RADIO_DIAG,         // Per-radio diagnostics
-    APP_MODE_PROFILES,           // Analyzer sampling profile
-    APP_MODE_SETTINGS,           // RF Power & Dwell Time Settings
-    APP_MODE_STATUS,             // Device Status Information
-    APP_MODE_POWER,              // Restart / shutdown selection
-    APP_MODE_REBOOT,             // System Reboot / Restart
-    APP_MODE_SHUTDOWN            // Deep-sleep software shutdown
-};
-
-enum JammerTarget {
-    JAM_TARGET_WIFI = 0,         // Wi-Fi 2.4 GHz Target (50 Programmed Channels)
-    JAM_TARGET_BT = 1,           // Bluetooth Classic Target (Ch 1 - 80 Even+Odd Hop)
-    JAM_TARGET_BLE_ADV = 2,      // BLE Advertising Target (Ch 1-3, 25-27, 79-81)
-    JAM_TARGET_BLE_DATA = 3,     // BLE Data Target (12 Ch from 3 Groups)
-    JAM_TARGET_ALL = 4,          // Full 2.4 GHz Band / Drone Target (Ch 1 - 100)
-    JAM_TARGET_ZIGBEE = 5        // Zigbee Target (Ch 11 - 26)
-};
-
-enum AnalyzerBand {
-    SCAN_BAND_ALL = 0,           // Scan all 126 channels (0 - 125)
-    SCAN_BAND_WIFI = 1,          // Scan Wi-Fi channel range (1 - 73)
-    SCAN_BAND_BT = 2             // Scan Bluetooth channel range (2 - 80)
-};
-
-enum AnalyzerRadioMode {
-    ANALYZER_RADIO_FAST = 0,       // Radio 1/2 scan adjacent channels in parallel
-    ANALYZER_RADIO_DIVERSITY = 1,  // Both radios observe the same channel
-    ANALYZER_RADIO_1 = 2,          // Radio 1 only
-    ANALYZER_RADIO_2 = 3           // Radio 2 only
-};
-
-enum ScanProfile {
-    SCAN_PROFILE_FAST = 0,
-    SCAN_PROFILE_BALANCED = 1,
-    SCAN_PROFILE_DEEP = 2,
-    SCAN_PROFILE_CUSTOM = 3
-};
-
-constexpr int WATERFALL_ROWS = 24;
-constexpr int RF_EVENT_COUNT = 8;
-
-struct RfEvent {
-    unsigned long timestampMs = 0;
-    uint8_t channel = 0;
-    uint8_t level = 0;
-};
-
-// =============================================================================
-// STRUKTUR STATE GLOBAL
+// GLOBAL APPLICATION STATE
 // =============================================================================
 
 struct AppState {
@@ -141,7 +81,7 @@ struct AppState {
     void resetSurvey();
     void clearEvents();
     void getAnalyzerChannelRange(int &minCh, int &maxCh) const;
-        void resetPeaks();
+    void resetPeaks();
     void decayPeaks();
 
     // NVS Persistence

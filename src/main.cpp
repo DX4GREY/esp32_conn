@@ -16,13 +16,14 @@
 #include <Arduino.h>
 #include <esp_sleep.h>
 #include <driver/rtc_io.h>
-#include "Config.h"
-#include "AppState.h"
-#include "Watchdog.h"
-#include "ButtonManager.h"
-#include "RadioManager.h"
-#include "DisplayManager.h"
-#include "SerialCommander.h"
+#include "config/Config.h"
+#include "core/AppState.h"
+#include "core/AppModePolicy.h"
+#include "services/Watchdog.h"
+#include "drivers/ButtonManager.h"
+#include "drivers/RadioManager.h"
+#include "ui/DisplayManager.h"
+#include "services/SerialCommander.h"
 
 static constexpr unsigned long WAKE_HOLD_MS = 1500;
 
@@ -117,11 +118,8 @@ void loop() {
     displayManager.processInput();
 
     // 4. Execute Based on Active Mode
-    if (appState.appMode == APP_MODE_ANALYZER_SPECTRUM ||
-        appState.appMode == APP_MODE_WATERFALL ||
-        appState.appMode == APP_MODE_SURVEY ||
-        appState.appMode == APP_MODE_EVENTS ||
-        (appState.appMode == APP_MODE_LOGGING && appState.loggingEnabled)) {
+    if (AppModePolicy::runsSpectrumScan(appState.appMode,
+                                        appState.loggingEnabled)) {
         // Radio Analyzer Mode: Scan 126 channels and update spectrum levels
         radioManager.scanSpectrum(yieldToUI);
     } else if (appState.appMode == APP_MODE_ANALYZER_CHANNEL) {
