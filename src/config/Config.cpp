@@ -1,85 +1,322 @@
 #include "config/Config.h"
 #include <Arduino.h>
+// ============================================================
+// nRF24L01 / 2.4 GHz CHANNEL PRESETS
+//
+// nRF24 RF_CH mapping:
+//   RF_CH 0  = 2400 MHz
+//   RF_CH 1  = 2401 MHz
+//   RF_CH 2  = 2402 MHz
+//   ...
+//   RF_CH 83 = 2483 MHz
+//
+// IMPORTANT:
+// Angka di bawah adalah nilai RF_CH nRF24,
+// BUKAN nomor channel Wi-Fi / BLE secara langsung.
+// ============================================================
 
-// =============================================================================
-// CHANNEL DEFINITIONS - Defined once to avoid multiple copies across TUs
-// (const at namespace scope has internal linkage in C++, so each .cpp that
-//  includes Config.h previously got its own copy — wasting ~112KB flash)
-// =============================================================================
 
+// ============================================================
+// BLUETOOTH / BLE FREQUENCY GRID
+// ============================================================
+
+// BLE menggunakan center frequency:
+// 2402, 2404, 2406, ... 2480 MHz
+//
+// Dalam RF_CH nRF24:
+// 2, 4, 6, ... 80
+//
+// Total = 40 BLE RF center frequencies.
 const byte bluetooth_even_channels[] = {
-    2,  4,  6,  8,  10, 12, 14, 16, 18, 20,
-    22, 24, 26, 28, 30, 32, 34, 36, 38, 40,
-    42, 44, 46, 48, 50, 52, 54, 56, 58, 60,
-    62, 64, 66, 68, 70, 72, 74, 76, 78, 80
+    2,  4,  6,  8,  10,
+    12, 14, 16, 18, 20,
+    22, 24, 26, 28, 30,
+    32, 34, 36, 38, 40,
+    42, 44, 46, 48, 50,
+    52, 54, 56, 58, 60,
+    62, 64, 66, 68, 70,
+    72, 74, 76, 78, 80
 };
 
-const int BLUETOOTH_EVEN_CHANNELS_COUNT = sizeof(bluetooth_even_channels);
+const int BLUETOOTH_EVEN_CHANNELS_COUNT =
+    sizeof(bluetooth_even_channels) /
+    sizeof(bluetooth_even_channels[0]);
 
-// All odd channels 1..79 (2401..2479 MHz)
+
+// ------------------------------------------------------------
+// Odd RF_CH sampling points.
+//
+// CATATAN:
+// Ini BUKAN channel center BLE.
+// Ini adalah frequency sampling points di antara center BLE.
+//
+// Contoh:
+// RF_CH 1 = 2401 MHz
+// RF_CH 3 = 2403 MHz
+// RF_CH 5 = 2405 MHz
+// dst.
+//
+// Tetap dipertahankan karena berguna untuk passive spectrum
+// sampling / melihat energi di antara BLE center frequencies.
+// ------------------------------------------------------------
 const byte bluetooth_odd_channels[] = {
-    1,  3,  5,  7,  9,  11, 13, 15, 17, 19,
-    21, 23, 25, 27, 29, 31, 33, 35, 37, 39,
-    41, 43, 45, 47, 49, 51, 53, 55, 57, 59,
-    61, 63, 65, 67, 69, 71, 73, 75, 77, 79
+    1,  3,  5,  7,  9,
+    11, 13, 15, 17, 19,
+    21, 23, 25, 27, 29,
+    31, 33, 35, 37, 39,
+    41, 43, 45, 47, 49,
+    51, 53, 55, 57, 59,
+    61, 63, 65, 67, 69,
+    71, 73, 75, 77, 79
 };
 
-const int BLUETOOTH_ODD_CHANNELS_COUNT = sizeof(bluetooth_odd_channels);
+const int BLUETOOTH_ODD_CHANNELS_COUNT =
+    sizeof(bluetooth_odd_channels) /
+    sizeof(bluetooth_odd_channels[0]);
 
-// --- Wi-Fi 2.4 GHz (50 programmed channels, 22 MHz band) ---
+
+// ============================================================
+// WI-FI 2.4 GHz
+// ============================================================
+//
+// Wi-Fi channel center frequency:
+//
+// CH1  = 2412 MHz -> RF_CH 12
+// CH2  = 2417 MHz -> RF_CH 17
+// CH3  = 2422 MHz -> RF_CH 22
+// CH4  = 2427 MHz -> RF_CH 27
+// CH5  = 2432 MHz -> RF_CH 32
+// CH6  = 2437 MHz -> RF_CH 37
+// CH7  = 2442 MHz -> RF_CH 42
+// CH8  = 2447 MHz -> RF_CH 47
+// CH9  = 2452 MHz -> RF_CH 52
+// CH10 = 2457 MHz -> RF_CH 57
+// CH11 = 2462 MHz -> RF_CH 62
+// CH12 = 2467 MHz -> RF_CH 67
+// CH13 = 2472 MHz -> RF_CH 72
+//
+// Ini center sampling points, bukan seluruh bandwidth channel.
+// ============================================================
+
 const byte wifi_channels[] = {
-    6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18,
-    22, 24, 26, 28,
-    30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
-    46, 48, 50, 52,
-    55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68
+    12,  // Wi-Fi CH 1  - 2412 MHz
+    17,  // Wi-Fi CH 2  - 2417 MHz
+    22,  // Wi-Fi CH 3  - 2422 MHz
+    27,  // Wi-Fi CH 4  - 2427 MHz
+    32,  // Wi-Fi CH 5  - 2432 MHz
+    37,  // Wi-Fi CH 6  - 2437 MHz
+    42,  // Wi-Fi CH 7  - 2442 MHz
+    47,  // Wi-Fi CH 8  - 2447 MHz
+    52,  // Wi-Fi CH 9  - 2452 MHz
+    57,  // Wi-Fi CH 10 - 2457 MHz
+    62,  // Wi-Fi CH 11 - 2462 MHz
+    67,  // Wi-Fi CH 12 - 2467 MHz
+    72   // Wi-Fi CH 13 - 2472 MHz
 };
 
-const int WIFI_CHANNELS_COUNT = sizeof(wifi_channels);
+const int WIFI_CHANNELS_COUNT =
+    sizeof(wifi_channels) /
+    sizeof(wifi_channels[0]);
 
-// --- BLE Advertising (Ch 37/38/39 = RF 2/26/80 + adjacent channels) ---
-const byte ble_channels[] = {1, 2, 3, 25, 26, 27, 79, 80, 81};
 
-const int BLE_CHANNELS_COUNT = sizeof(ble_channels);
+// ============================================================
+// BLE PRIMARY ADVERTISING FREQUENCIES + ±1 MHz SAMPLING
+// ============================================================
+//
+// BLE primary advertising:
+//
+// BLE CH37 -> 2402 MHz -> RF_CH 2
+// BLE CH38 -> 2426 MHz -> RF_CH 26
+// BLE CH39 -> 2480 MHz -> RF_CH 80
+//
+// Di sini ±1 MHz ikut dipantau untuk passive energy sampling:
+//
+// 2401 / 2402 / 2403
+// 2425 / 2426 / 2427
+// 2479 / 2480 / 2481
+//
+// Hanya 2, 26 dan 80 yang merupakan BLE advertising centers.
+// ============================================================
 
-// --- USB / Video / RC presets ---
-const byte usb_channels[] = {40, 50, 60};
+const byte ble_channels[] = {
+    1, 2, 3,
+    25, 26, 27,
+    79, 80, 81
+};
 
-const int USB_CHANNELS_COUNT = sizeof(usb_channels);
+const int BLE_CHANNELS_COUNT =
+    sizeof(ble_channels) /
+    sizeof(ble_channels[0]);
 
-const byte video_channels[] = {70, 75, 80};
 
-const int VIDEO_CHANNELS_COUNT = sizeof(video_channels);
+// ============================================================
+// CUSTOM DEVICE PRESETS
+// ============================================================
+//
+// Tidak ada standar universal yang menyatakan:
+// "USB = RF_CH 40/50/60"
+// "Video = RF_CH 70/75/80"
+// "RC = RF_CH 1/3/5/7"
+//
+// Jadi nama variabel dan value lama dipertahankan sebagai
+// CUSTOM sampling presets.
+// ============================================================
 
-const byte rc_channels[] = {1, 3, 5, 7};
+const byte usb_channels[] = {
+    40,  // 2440 MHz
+    50,  // 2450 MHz
+    60   // 2460 MHz
+};
 
-const int RC_CHANNELS_COUNT = sizeof(rc_channels);
+const int USB_CHANNELS_COUNT =
+    sizeof(usb_channels) /
+    sizeof(usb_channels[0]);
 
-// --- Full 2.4 GHz band (channels 1..100) ---
+
+const byte video_channels[] = {
+    70,  // 2470 MHz
+    75,  // 2475 MHz
+    80   // 2480 MHz
+};
+
+const int VIDEO_CHANNELS_COUNT =
+    sizeof(video_channels) /
+    sizeof(video_channels[0]);
+
+
+const byte rc_channels[] = {
+    1,   // 2401 MHz
+    3,   // 2403 MHz
+    5,   // 2405 MHz
+    7    // 2407 MHz
+};
+
+const int RC_CHANNELS_COUNT =
+    sizeof(rc_channels) /
+    sizeof(rc_channels[0]);
+
+
+// ============================================================
+// FULL 2.4 GHz ISM BAND
+// ============================================================
+//
+// ISM band:
+// 2400 MHz - 2483.5 MHz
+//
+// RF_CH:
+// 0 -> 2400 MHz
+// ...
+// 83 -> 2483 MHz
+//
+// nRF24 chip dapat dituning lebih tinggi,
+// tetapi RF_CH > 83 berada di atas batas nominal
+// 2.4 GHz ISM band 2483.5 MHz.
+// ============================================================
+
 const byte full_channels[] = {
-    1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-    22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
-    43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-    64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84,
-    85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100
+     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
+    70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+    80, 81, 82, 83
 };
 
-const int FULL_CHANNELS_COUNT = sizeof(full_channels);
+const int FULL_CHANNELS_COUNT =
+    sizeof(full_channels) /
+    sizeof(full_channels[0]);
 
-// 3 Main BLE Advertising Channels (2402, 2426, 2480 MHz)
-const int BLE_ADV_CHANNELS[3] = {2, 26, 80};
 
-const byte channelGroup1[4] = {2, 5, 8, 11};
-const byte channelGroup2[4] = {26, 29, 32, 35};
+// ============================================================
+// 3 MAIN BLE PRIMARY ADVERTISING CHANNELS
+// ============================================================
+//
+// BLE channel 37 = 2402 MHz = RF_CH 2
+// BLE channel 38 = 2426 MHz = RF_CH 26
+// BLE channel 39 = 2480 MHz = RF_CH 80
+//
+// Ini mapping yang benar.
+// ============================================================
 
-const byte channelGroup3[4] = {80, 83, 86, 89};
+const int BLE_ADV_CHANNELS[3] = {
+    2,
+    26,
+    80
+};
 
-// Combined BLE Data Channels (all 12 channels from the 3 groups)
+
+// ============================================================
+// SELECTED BLE GENERAL-PURPOSE / DATA RF CENTERS
+// ============================================================
+//
+// BLE mempunyai 37 general-purpose RF channels.
+// BLE RF centers selalu berada pada grid 2 MHz:
+//
+// 2404, 2406, ..., 2424 MHz
+// 2428, 2430, ..., 2478 MHz
+//
+// Advertising centers:
+// 2402 / 2426 / 2480
+//
+// Array di bawah tetap berisi 4 elemen per group supaya
+// kompatibel dengan implementasi lama.
+//
+// Semua value sekarang berada tepat pada BLE RF center.
+// ============================================================
+
+
+// Region bawah dekat BLE advertising 2402 MHz
+const byte channelGroup1[4] = {
+    4,   // 2404 MHz
+    6,   // 2406 MHz
+    8,   // 2408 MHz
+    10   // 2410 MHz
+};
+
+
+// Region sekitar BLE advertising 2426 MHz
+// Advertising center RF_CH 26 sengaja tidak dimasukkan.
+const byte channelGroup2[4] = {
+    20,  // 2420 MHz
+    22,  // 2422 MHz
+    24,  // 2424 MHz
+    28   // 2428 MHz
+};
+
+
+// Region atas dekat BLE advertising 2480 MHz
+const byte channelGroup3[4] = {
+    72,  // 2472 MHz
+    74,  // 2474 MHz
+    76,  // 2476 MHz
+    78   // 2478 MHz
+};
+
+
+// ============================================================
+// SELECTED BLE DATA / GENERAL-PURPOSE RF CENTERS
+// ============================================================
+//
+// Tetap 12 elemen agar compatible dengan kode lama.
+//
+// CATATAN:
+// BLE sebenarnya mempunyai 37 general-purpose RF channels.
+// Array ini hanyalah 12 VALID BLE RF center sampling points
+// yang dibagi menjadi tiga region.
+// ============================================================
 
 const byte BLE_DATA_CHANNELS[12] = {
-    2, 5, 8, 11,       // Group 1 (near advertising channel 2)
-    26, 29, 32, 35,    // Group 2 (near advertising channel 26)
-    80, 83, 86, 89     // Group 3 (near advertising channel 80)
+    // Lower BLE region
+    4, 6, 8, 10,
+
+    // Middle BLE region
+    20, 22, 24, 28,
+
+    // Upper BLE region
+    72, 74, 76, 78
 };
 
 const uint8_t FAST_JAM_PAYLOAD[1] = {0xAA};
