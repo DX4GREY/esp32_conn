@@ -45,6 +45,8 @@ void DisplayManager::resetDynamicCaches() {
     memset(previousPeakLevels, 0xFF, sizeof(previousPeakLevels));
     previousHeaderPeakLevel = 0xFF;
     previousHeaderPeakChannel = -1;
+    previousHeaderRadio1Level = 0xFF;
+    previousHeaderRadio2Level = 0xFF;
     previousInspectedLevel = 0xFF;
     previousInspectedPeak = 0xFF;
     carrierStatusValid = false;
@@ -339,13 +341,23 @@ void DisplayManager::drawSpectrumGrid() {
     tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
     tft.print("GHz");
 
-    drawModernFooter("U BAND", "R RESET", "B BACK");
+    tft.fillRect(0, 105, 160, 23, ST77XX_BLACK);
+    drawFooterChip(2, 37, "U BAND");
+    String modeChip = "D ";
+    modeChip += appState.getAnalyzerRadioModeName();
+    drawFooterChip(41, 37, modeChip.c_str());
+    drawFooterChip(80, 37, "R RST");
+    drawFooterChip(119, 39, "B BACK");
 }
 
 void DisplayManager::drawSpectrumBars() {
+    const uint8_t peakRadio1 = appState.radio1Levels[appState.peakChannel];
+    const uint8_t peakRadio2 = appState.radio2Levels[appState.peakChannel];
     // Header is redrawn only when its displayed value changes.
     if (previousHeaderPeakChannel != appState.peakChannel ||
-        previousHeaderPeakLevel != appState.peakLevel) {
+        previousHeaderPeakLevel != appState.peakLevel ||
+        previousHeaderRadio1Level != peakRadio1 ||
+        previousHeaderRadio2Level != peakRadio2) {
         tft.fillRect(99, 1, 61, 11, SPECTRUM_HEADER_BG);
         tft.setCursor(99, 3);
         tft.setTextColor(ST77XX_GRAY, SPECTRUM_HEADER_BG);
@@ -357,6 +369,23 @@ void DisplayManager::drawSpectrumBars() {
         tft.print("%");
         previousHeaderPeakChannel = appState.peakChannel;
         previousHeaderPeakLevel = appState.peakLevel;
+
+        tft.fillRect(18, 95, 126, 8, ST77XX_BLACK);
+        String radioSummary;
+        if (appState.analyzerRadioMode == ANALYZER_RADIO_FAST) {
+            radioSummary = "FAST  R1/R2 SPLIT";
+        } else if (appState.analyzerRadioMode == ANALYZER_RADIO_DIVERSITY) {
+            radioSummary = "R1:" + String(peakRadio1) + "% R2:" + String(peakRadio2) + "%";
+        } else if (appState.analyzerRadioMode == ANALYZER_RADIO_1) {
+            radioSummary = "RADIO 1  " + String(peakRadio1) + "%";
+        } else {
+            radioSummary = "RADIO 2  " + String(peakRadio2) + "%";
+        }
+        tft.setCursor(centeredTextX(radioSummary), 95);
+        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        tft.print(radioSummary);
+        previousHeaderRadio1Level = peakRadio1;
+        previousHeaderRadio2Level = peakRadio2;
     }
 
     tft.startWrite();
@@ -424,6 +453,10 @@ void DisplayManager::renderSpectrumAnalyzer() {
         drawSpectrumGrid();
         memset(previousSpectrumLevels, 0xFF, sizeof(previousSpectrumLevels));
         memset(previousPeakLevels, 0xFF, sizeof(previousPeakLevels));
+        previousHeaderPeakChannel = -1;
+        previousHeaderPeakLevel = 0xFF;
+        previousHeaderRadio1Level = 0xFF;
+        previousHeaderRadio2Level = 0xFF;
         needRedraw = false;
     }
 
@@ -819,8 +852,11 @@ void DisplayManager::processInput() {
     // CONDITION 3: SPECTRUM ANALYZER
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_ANALYZER_SPECTRUM) {
-        if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
+        if (buttonManager.isPressed(BTN_UP)) {
             appState.cycleAnalyzerBand(1);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            appState.cycleAnalyzerRadioMode(1);
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             appState.resetPeaks();

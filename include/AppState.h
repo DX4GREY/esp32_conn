@@ -33,6 +33,13 @@ enum AnalyzerBand {
     SCAN_BAND_BT = 2             // Scan Bluetooth channel range (2 - 80)
 };
 
+enum AnalyzerRadioMode {
+    ANALYZER_RADIO_FAST = 0,       // Radio 1/2 scan adjacent channels in parallel
+    ANALYZER_RADIO_DIVERSITY = 1,  // Both radios observe the same channel
+    ANALYZER_RADIO_1 = 2,          // Radio 1 only
+    ANALYZER_RADIO_2 = 3           // Radio 2 only
+};
+
 // =============================================================================
 // STRUKTUR STATE GLOBAL
 // =============================================================================
@@ -55,8 +62,11 @@ struct AppState {
 
     // ----- ANALYZER STATE -----
     AnalyzerBand analyzerBand = SCAN_BAND_ALL;
+    AnalyzerRadioMode analyzerRadioMode = ANALYZER_RADIO_FAST;
     uint8_t spectrumLevels[TOTAL_CHANNELS];  // Current RF activity (0 - 100%)
     uint8_t peakLevels[TOTAL_CHANNELS];      // Peak Hold Value (0 - 100%)
+    uint8_t radio1Levels[TOTAL_CHANNELS];    // Per-radio activity for diagnostics
+    uint8_t radio2Levels[TOTAL_CHANNELS];
     int peakChannel = 0;                     // Channel with the highest RF
     uint8_t peakLevel = 0;                   // Current highest RF value (%)
 
@@ -84,6 +94,8 @@ struct AppState {
 
     void cycleAnalyzerBand(int direction = 1);
     const char* getAnalyzerBandName() const;
+    void cycleAnalyzerRadioMode(int direction = 1);
+    const char* getAnalyzerRadioModeName() const;
     void getAnalyzerChannelRange(int &minCh, int &maxCh) const;
         void resetPeaks();
     void decayPeaks();

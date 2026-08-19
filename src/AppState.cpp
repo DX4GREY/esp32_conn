@@ -200,6 +200,24 @@ const char* AppState::getAnalyzerBandName() const {
     }
 }
 
+void AppState::cycleAnalyzerRadioMode(int direction) {
+    int current = static_cast<int>(analyzerRadioMode);
+    constexpr int total = 4;
+    current = (current + direction + total) % total;
+    analyzerRadioMode = static_cast<AnalyzerRadioMode>(current);
+    resetPeaks();
+}
+
+const char* AppState::getAnalyzerRadioModeName() const {
+    switch (analyzerRadioMode) {
+        case ANALYZER_RADIO_FAST:      return "FAST";
+        case ANALYZER_RADIO_DIVERSITY: return "DIV";
+        case ANALYZER_RADIO_1:         return "R1";
+        case ANALYZER_RADIO_2:         return "R2";
+        default:                       return "FAST";
+    }
+}
+
 void AppState::getAnalyzerChannelRange(int &minCh, int &maxCh) const {
     switch (analyzerBand) {
         case SCAN_BAND_WIFI:
@@ -222,6 +240,8 @@ void AppState::resetPeaks() {
     for (int i = 0; i < TOTAL_CHANNELS; i++) {
         spectrumLevels[i] = 0;
         peakLevels[i] = 0;
+        radio1Levels[i] = 0;
+        radio2Levels[i] = 0;
     }
     peakChannel = 0;
     peakLevel = 0;

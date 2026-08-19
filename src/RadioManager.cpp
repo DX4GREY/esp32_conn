@@ -362,33 +362,71 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
     int highestCh = minCh;
     uint8_t highestLvl = 0;
 
-    for (int ch = minCh; ch <= maxCh; ch++) {
-        radio.setChannel(ch);
-        radio2.setChannel(ch);
-        delayMicroseconds(35); // PLL Synthesizer stabilization time
-
-        int hits = 0;
-        for (int s = 0; s < SPECTRUM_SAMPLES_PER_CH; s++) {
-            if (radio.testRPD() || radio.testCarrier() || radio2.testRPD() || radio2.testCarrier()) {
-                hits++;
-            }
-            delayMicroseconds(8);
-        }
-
-        uint8_t lvl = (hits * 100) / SPECTRUM_SAMPLES_PER_CH;
-        appState.spectrumLevels[ch] = lvl;
-
-        if (lvl > appState.peakLevels[ch]) {
-            appState.peakLevels[ch] = lvl;
-        }
-
-        if (lvl > highestLvl) {
-            highestLvl = lvl;
+    auto storeLevel = [&](int ch, uint8_t combined, uint8_t level1, uint8_t level2) {
+        appState.spectrumLevels[ch] = combined;
+        appState.radio1Levels[ch] = level1;
+        appState.radio2Levels[ch] = level2;
+        if (combined > appState.peakLevels[ch]) appState.peakLevels[ch] = combined;
+        if (combined > highestLvl) {
+            highestLvl = combined;
             highestCh = ch;
         }
+    };
 
-        if ((ch % 16 == 0) && yieldCb) {
-            yieldCb();
+    if (appState.analyzerRadioMode == ANALYZER_RADIO_FAST) {
+        // Each radio listens on a different channel during the same sample
+        // window. Shared SPI setup remains sequential, but RF observation is
+        // parallel, reducing a full-band sweep to roughly half as many windows.
+        for (int ch = minCh; ch <= maxCh; ch += 2) {
+            const int ch2 = ch + 1;
+            const bool hasSecondChannel = ch2 <= maxCh;
+            radio.setChannel(ch);
+            if (hasSecondChannel) radio2.setChannel(ch2);
+            delayMicroseconds(35);
+
+            int hits1 = 0;
+            int hits2 = 0;
+            for (int s = 0; s < SPECTRUM_SAMPLES_PER_CH; s++) {
+                if (radio.testRPD() || radio.testCarrier()) hits1++;
+                if (hasSecondChannel && (radio2.testRPD() || radio2.testCarrier())) hits2++;
+                delayMicroseconds(8);
+            }
+
+            const uint8_t level1 = (hits1 * 100) / SPECTRUM_SAMPLES_PER_CH;
+            storeLevel(ch, level1, level1, 0);
+            if (hasSecondChannel) {
+                const uint8_t level2 = (hits2 * 100) / SPECTRUM_SAMPLES_PER_CH;
+                storeLevel(ch2, level2, 0, level2);
+            }
+
+            if ((((ch - minCh) / 2) % 8 == 0) && yieldCb) yieldCb();
+        }
+    } else {
+        for (int ch = minCh; ch <= maxCh; ch++) {
+            const bool useRadio1 = appState.analyzerRadioMode != ANALYZER_RADIO_2;
+            const bool useRadio2 = appState.analyzerRadioMode != ANALYZER_RADIO_1;
+            if (useRadio1) radio.setChannel(ch);
+            if (useRadio2) radio2.setChannel(ch);
+            delayMicroseconds(35);
+
+            int hits1 = 0;
+            int hits2 = 0;
+            int combinedHits = 0;
+            for (int s = 0; s < SPECTRUM_SAMPLES_PER_CH; s++) {
+                const bool hit1 = useRadio1 && (radio.testRPD() || radio.testCarrier());
+                const bool hit2 = useRadio2 && (radio2.testRPD() || radio2.testCarrier());
+                if (hit1) hits1++;
+                if (hit2) hits2++;
+                if (hit1 || hit2) combinedHits++;
+                delayMicroseconds(8);
+            }
+
+            const uint8_t level1 = (hits1 * 100) / SPECTRUM_SAMPLES_PER_CH;
+            const uint8_t level2 = (hits2 * 100) / SPECTRUM_SAMPLES_PER_CH;
+            const uint8_t combined = (combinedHits * 100) / SPECTRUM_SAMPLES_PER_CH;
+            storeLevel(ch, combined, level1, level2);
+
+            if (((ch - minCh) % 16 == 0) && yieldCb) yieldCb();
         }
     }
 
