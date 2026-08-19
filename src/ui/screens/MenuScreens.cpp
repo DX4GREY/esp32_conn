@@ -181,8 +181,9 @@ void DisplayManager::renderJammerScreen() {
 
     // Status Box (Active / Standby, Height 34px)
     int statusY = 54;
-    if (!jammingStatusValid || previousJamming != appState.jamming ||
-        (appState.jamming && previousJamChannel != appState.currentJamChannel)) {
+    const int radio1Channel = appState.currentJamChannel;
+    const int radio2Channel = appState.currentJamChannel2;
+    if (!jammingStatusValid || previousJamming != appState.jamming) {
         if (appState.jamming) {
             const uint16_t activeBg = 0x4004;
             tft.fillRoundRect(5, statusY, 150, 34, 4, activeBg);
@@ -190,13 +191,7 @@ void DisplayManager::renderJammerScreen() {
             tft.fillCircle(13, statusY + 9, 3, SPECTRUM_CRITICAL);
             tft.setCursor(20, statusY + 6);
             tft.setTextColor(ST77XX_WHITE, activeBg);
-            tft.print("TRANSMIT ACTIVE");
-            tft.setCursor(20, statusY + 20);
-            tft.print("Ch: ");
-            tft.print(appState.currentJamChannel);
-            tft.print(" (");
-            tft.print(2400 + appState.currentJamChannel);
-            tft.print(" MHz)   ");
+            tft.print("ACTIVE  CH / MHz");
         } else {
             tft.fillRoundRect(5, statusY, 150, 34, 4, SPECTRUM_CARD_BG);
             tft.drawRoundRect(5, statusY, 150, 34, 4, SPECTRUM_BORDER);
@@ -206,8 +201,30 @@ void DisplayManager::renderJammerScreen() {
             tft.print("READY / STANDBY");
         }
         previousJamming = appState.jamming;
-        previousJamChannel = appState.currentJamChannel;
+        previousJamChannel = -1;
+        previousJamChannel2 = -1;
         jammingStatusValid = true;
+    }
+
+    // Only update the changing value row. Each frequency is derived from the
+    // same channel snapshot so a Core 0 hop cannot produce a mismatched pair.
+    if (appState.jamming &&
+        (previousJamChannel != radio1Channel ||
+         previousJamChannel2 != radio2Channel)) {
+        const uint16_t activeBg = 0x4004;
+        tft.fillRect(9, statusY + 18, 142, 11, activeBg);
+        tft.setCursor(10, statusY + 20);
+        tft.setTextColor(ST77XX_WHITE, activeBg);
+        tft.print("R1 ");
+        tft.print(radio1Channel);
+        tft.print("/");
+        tft.print(2400 + radio1Channel);
+        tft.print(" R2 ");
+        tft.print(radio2Channel);
+        tft.print("/");
+        tft.print(2400 + radio2Channel);
+        previousJamChannel = radio1Channel;
+        previousJamChannel2 = radio2Channel;
     }
 
     // Power & Dwell Info

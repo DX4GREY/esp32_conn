@@ -28,6 +28,7 @@ void DisplayManager::resetDynamicCaches() {
     settingsLayoutDrawn = false;
     previousJammerTarget = -1;
     previousJamChannel = -1;
+    previousJamChannel2 = -1;
     previousPowerLevel = -1;
     previousDwellTimeUs = -1;
     previousSettingsSelection = -1;

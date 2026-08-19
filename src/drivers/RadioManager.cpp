@@ -36,8 +36,9 @@ void armContinuousJam(RF24 &r) {
 }
 
 // One aggressive hop: retune + re-assert reuse + dwell at 100% duty.
-inline void hopAndReuse(RF24 &r, uint8_t ch) {
+inline void hopAndReuse(RF24 &r, uint8_t ch, volatile int &activeChannel) {
     r.setChannel(ch);
+    activeChannel = ch;
     r.reUseTX();
     delayMicroseconds(appState.dwellTimeUs);
 }
@@ -47,10 +48,10 @@ inline void hopAndReuse(RF24 &r, uint8_t ch) {
 void hopSplit(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
               const volatile bool &stop) {
     for (int i = 0; i < count && !stop; i++) {
-        hopAndReuse(rA, channels[i]);
+        hopAndReuse(rA, channels[i], appState.currentJamChannel);
         i++;
         if (i < count && !stop) {
-            hopAndReuse(rB, channels[i]);
+            hopAndReuse(rB, channels[i], appState.currentJamChannel2);
         }
     }
 }
@@ -59,9 +60,9 @@ void hopSplit(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
 void hopPaired(RF24 &rA, const uint8_t *listA, RF24 &rB, const uint8_t *listB,
                int count, const volatile bool &stop) {
     for (int i = 0; i < count && !stop; i++) {
-        hopAndReuse(rA, listA[i]);
+        hopAndReuse(rA, listA[i], appState.currentJamChannel);
         if (i < count && !stop) {
-            hopAndReuse(rB, listB[i]);
+            hopAndReuse(rB, listB[i], appState.currentJamChannel2);
         }
     }
 }
@@ -71,9 +72,9 @@ void hopPaired(RF24 &rA, const uint8_t *listA, RF24 &rB, const uint8_t *listB,
 void hopDuo(RF24 &rA, RF24 &rB, const uint8_t *channels, int count,
             const volatile bool &stop) {
     for (int i = 0; i < count && !stop; i++) {
-        hopAndReuse(rA, channels[i]);
+        hopAndReuse(rA, channels[i], appState.currentJamChannel);
         if (i < count && !stop) {
-            hopAndReuse(rB, channels[i]);
+            hopAndReuse(rB, channels[i], appState.currentJamChannel2);
         }
     }
 }
@@ -88,11 +89,11 @@ void hopZigbee(RF24 &rA, RF24 &rB, const volatile bool &stop) {
         while (ch <= endCh && !stop) {
             if (ch > MAX_CHANNEL) break;
 
-            hopAndReuse(rA, ch);
+            hopAndReuse(rA, ch, appState.currentJamChannel);
             ch++;
 
             if (ch <= endCh && ch <= MAX_CHANNEL && !stop) {
-                hopAndReuse(rB, ch);
+                hopAndReuse(rB, ch, appState.currentJamChannel2);
                 ch++;
             }
         }

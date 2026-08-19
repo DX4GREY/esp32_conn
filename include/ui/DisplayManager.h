@@ -54,6 +54,7 @@ private:
     bool settingsLayoutDrawn = false;
     int previousJammerTarget = -1;
     int previousJamChannel = -1;
+    int previousJamChannel2 = -1;
     int previousPowerLevel = -1;
     int previousDwellTimeUs = -1;
     int previousSettingsSelection = -1;

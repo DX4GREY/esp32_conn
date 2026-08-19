@@ -17,7 +17,9 @@ struct AppState {
     volatile JammerTarget jammerTarget = JAM_TARGET_WIFI;
     int jammerMinCh = WIFI_MIN_CH;
     int jammerMaxCh = WIFI_MAX_CH;
-    int currentJamChannel = 37;
+    // Updated by the Core 0 RF task and read by the Core 1 display task.
+    volatile int currentJamChannel = 37;
+    volatile int currentJamChannel2 = 37;
 
     // Radio Transmission Parameters (Dynamic RF Settings)
     rf24_pa_dbm_e powerLevel = DEFAULT_POWER;
