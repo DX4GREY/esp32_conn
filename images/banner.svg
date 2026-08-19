@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="500" viewBox="0 0 1600 500">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#050a12"/>
+    <stop offset="100%" stop-color="#0a1222"/>
+  </linearGradient>
+  <radialGradient id="glow" cx="68%" cy="50%" r="34%">
+    <stop offset="0%" stop-color="#16d6ff" stop-opacity=".14"/>
+    <stop offset="100%" stop-color="#16d6ff" stop-opacity="0"/>
+  </radialGradient>
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M40 0H0V40" fill="none" stroke="#22566a" stroke-opacity=".20"/>
+  </pattern>
+</defs>
+<rect width="1600" height="500" fill="url(#bg)"/>
+<rect width="1600" height="500" fill="url(#glow)"/>
+<rect width="1600" height="500" fill="url(#grid)"/>
+<rect x="70" y="58" rx="10" width="186" height="38" fill="#103241" stroke="#38b8d7"/>
+<text x="89" y="83" font-family="DejaVu Sans,Arial" font-size="17" font-weight="700" fill="#48e0ff">DX4GREY // RF LAB</text>
+<text x="70" y="202" font-family="DejaVu Sans,Arial" font-size="72" font-weight="700" fill="#edf6fa">RF24 SUITE</text>
+<rect x="72" y="220" rx="3" width="434" height="6" fill="#48e0ff"/>
+<text x="72" y="278" font-family="DejaVu Sans,Arial" font-size="28" fill="#b8d6e1">ESP32-S3 • Dual nRF24L01+ • 2.4 GHz Analyzer</text>
+<g font-family="DejaVu Sans,Arial" font-size="21" font-weight="700" fill="#98dfee">
+  <rect x="72" y="320" rx="12" width="151" height="41" fill="#091c27" stroke="#319cb7"/><text x="89" y="347">SPECTRUM</text>
+  <rect x="235" y="320" rx="12" width="167" height="41" fill="#091c27" stroke="#319cb7"/><text x="252" y="347">WATERFALL</text>
+  <rect x="414" y="320" rx="12" width="135" height="41" fill="#091c27" stroke="#319cb7"/><text x="431" y="347">LOGGING</text>
+  <rect x="561" y="320" rx="12" width="182" height="41" fill="#091c27" stroke="#319cb7"/><text x="578" y="347">DIAGNOSTICS</text>
+</g>
+<text x="72" y="416" font-family="DejaVu Sans,Arial" font-size="17" fill="#97b2be">Receive-first RF analysis • 2400–2525 MHz • Open-source firmware</text>
+<text x="72" y="449" font-family="monospace" font-size="16" fill="#5fb7cd">github.com/DX4GREY/esp32_rfsuite</text>
+<rect x="930" y="56" width="600" height="388" rx="28" fill="#0a1924" stroke="#2e98b2" stroke-width="2"/>
+<text x="962" y="99" font-family="DejaVu Sans,Arial" font-size="21" font-weight="700" fill="#48e0ff">LIVE RF OVERVIEW</text>
+<rect x="1358" y="76" width="137" height="30" rx="9" fill="#0d3630" stroke="#43cca9"/>
+<text x="1380" y="97" font-family="DejaVu Sans,Arial" font-size="17" fill="#50e6ae">RX MODE</text>
+<rect x="962" y="126" width="533" height="124" rx="12" fill="#050f17" stroke="#29687b"/>
+<polyline fill="none" stroke="#48e0ff" stroke-width="3"
+points="974,230 1000,218 1026,224 1052,196 1078,210 1104,166 1130,182 1156,205 1182,191 1208,151 1234,169 1260,199 1286,206 1312,173 1338,137 1364,157 1390,190 1416,203 1442,182 1468,215 1484,206"/>
+<rect x="962" y="268" width="233" height="144" rx="12" fill="#050f17" stroke="#29687b"/>
+<text x="976" y="299" font-family="DejaVu Sans,Arial" font-size="17" fill="#7ac8db">WATERFALL</text>
+<g fill="#20bfe7" opacity=".78">
+  <rect x="978" y="314" width="10" height="8" rx="2"/><rect x="994" y="314" width="10" height="8" rx="2"/><rect x="1010" y="314" width="10" height="8" rx="2"/><rect x="1026" y="314" width="10" height="8" rx="2"/>
+  <rect x="1042" y="314" width="10" height="8" rx="2"/><rect x="1058" y="314" width="10" height="8" rx="2"/><rect x="1074" y="314" width="10" height="8" rx="2"/><rect x="1090" y="314" width="10" height="8" rx="2"/>
+  <rect x="1106" y="314" width="10" height="8" rx="2"/><rect x="1122" y="314" width="10" height="8" rx="2"/><rect x="1138" y="314" width="10" height="8" rx="2"/><rect x="1154" y="314" width="10" height="8" rx="2"/>
+</g>
+<rect x="1212" y="268" width="283" height="144" rx="12" fill="#050f17" stroke="#29687b"/>
+<text x="1226" y="299" font-family="DejaVu Sans,Arial" font-size="17" fill="#7ac8db">HARDWARE</text>
+<rect x="1292" y="322" width="117" height="66" rx="9" fill="#10454d" stroke="#56e8d5" stroke-width="2"/>
+<rect x="1230" y="324" width="47" height="48" rx="7" fill="#133423" stroke="#4dc27c" stroke-width="2"/>
+<rect x="1433" y="324" width="47" height="48" rx="7" fill="#133423" stroke="#4dc27c" stroke-width="2"/>
+<line x1="1277" y1="348" x2="1292" y2="348" stroke="#49caca" stroke-width="2"/>
+<line x1="1409" y1="348" x2="1433" y2="348" stroke="#49caca" stroke-width="2"/>
+<text x="1308" y="405" font-family="monospace" font-size="16" fill="#50e6ae">ESP32-S3</text>
+<text x="1238" y="354" font-family="monospace" font-size="14" fill="#8eeab2">RF1</text>
+<text x="1441" y="354" font-family="monospace" font-size="14" fill="#8eeab2">RF2</text>
+</svg>

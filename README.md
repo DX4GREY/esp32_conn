@@ -1,5 +1,9 @@
 # RF24 Suite — ESP32-S3 Dual nRF24 2.4 GHz Analyzer
 
+<p align="center">
+  <img src="images/banner.svg" alt="RF24 Suite - ESP32-S3 Dual nRF24 2.4 GHz Analyzer">
+</p>
+
 A standalone firmware project for an ESP32-S3, one or two nRF24L01+ modules, and a 1.8-inch ST7735 TFT. It provides a 2.4 GHz spectrum analyzer, waterfall history, channel inspection, occupancy surveys, configurable RF event detection, LittleFS session recording, CSV export/replay, and live hardware/performance diagnostics. The default build is receive-only; active RF testing is isolated in a separate controlled-lab build profile.
 
 The interface is designed for a 160 × 128 landscape display. It uses partial/dirty rendering: the complete screen is cleared only during page transitions, while graphs, status values, and menu cards are redrawn only where their content changes. This reduces flicker and keeps the UI responsive.
