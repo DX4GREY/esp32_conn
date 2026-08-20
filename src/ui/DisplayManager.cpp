@@ -24,6 +24,7 @@ void DisplayManager::resetDynamicCaches() {
     lastInspectorRenderMs = 0;
     lastJammerRenderMs = 0;
     lastStatusRenderMs = 0;
+    lastEnvRenderMs = 0;
     jammerLayoutDrawn = false;
     settingsLayoutDrawn = false;
     previousJammerTarget = -1;

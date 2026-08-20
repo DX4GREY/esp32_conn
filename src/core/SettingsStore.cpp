@@ -1,8 +1,9 @@
 #include "core/AppState.h"
 #include <Preferences.h>
+#include "core/RfEnvironmentState.h"
 
 namespace {
-constexpr uint8_t SETTINGS_SCHEMA_VERSION = 2;
+constexpr uint8_t SETTINGS_SCHEMA_VERSION = 3;
 constexpr unsigned long SETTINGS_SAVE_DELAY_MS = 1500;
 }
 
@@ -46,6 +47,25 @@ void AppState::loadSettings() {
             prefs.getBytes("watch", watchedChannels, sizeof(watchedChannels));
         }
     }
+    if (storedSchema >= 3) {
+        rfEnvironmentState.config.sampleWindowSeconds = prefs.getUShort("env_win", 10);
+        rfEnvironmentState.config.minChannel = constrain(prefs.getUChar("env_min", 0), 0, 125);
+        rfEnvironmentState.config.maxChannel = constrain(prefs.getUChar("env_max", 125), rfEnvironmentState.config.minChannel, 125);
+        rfEnvironmentState.config.burstThreshold = constrain(prefs.getUChar("env_burst", 25), 5, 80);
+        rfEnvironmentState.config.emaAlpha = constrain(prefs.getUChar("env_alpha", 25), 1, 100);
+        rfEnvironmentState.config.historyDepth = constrain(prefs.getUChar("env_hist", RF_ENV_HISTORY_BUCKETS), 8, RF_ENV_HISTORY_BUCKETS);
+        if (prefs.getBytesLength("env_cmp") == sizeof(rfEnvironmentState.config.compareChannels))
+            prefs.getBytes("env_cmp", rfEnvironmentState.config.compareChannels, sizeof(rfEnvironmentState.config.compareChannels));
+        rfEnvironmentState.config.compareCount = constrain(prefs.getUChar("env_cmp_n", 2), 2, RF_ENV_COMPARE_MAX);
+#if RF_LAB_TX_ENABLED
+        rfEnvironmentState.config.probeChannel = constrain(prefs.getUChar("prb_ch", 42), 0, 125);
+        rfEnvironmentState.config.probeIntervalMs = constrain(prefs.getUShort("prb_int", 100), 20, 5000);
+        rfEnvironmentState.config.probePacketCount = constrain(prefs.getUShort("prb_cnt", 100), 1, 1000);
+        rfEnvironmentState.config.probeMaxDurationSeconds = constrain(prefs.getUShort("prb_dur", 10), 1, 60);
+        rfEnvironmentState.config.probePayloadSize = constrain(prefs.getUChar("prb_size", 8), 1, 32);
+        { const uint8_t rate=prefs.getUChar("prb_rate",RF24_1MBPS); rfEnvironmentState.config.probeDataRate=(rate==RF24_250KBPS||rate==RF24_1MBPS||rate==RF24_2MBPS)?rate:RF24_1MBPS; }
+#endif
+    }
     prefs.end();
 
     setJammerTarget(jammerTarget);
@@ -69,6 +89,22 @@ void AppState::saveSettings() {
     prefs.putUChar("evt_dur", eventMinSweeps);
     prefs.putUChar("evt_multi", eventMinChannels);
     prefs.putBytes("watch", watchedChannels, sizeof(watchedChannels));
+    prefs.putUShort("env_win", rfEnvironmentState.config.sampleWindowSeconds);
+    prefs.putUChar("env_min", rfEnvironmentState.config.minChannel);
+    prefs.putUChar("env_max", rfEnvironmentState.config.maxChannel);
+    prefs.putUChar("env_burst", rfEnvironmentState.config.burstThreshold);
+    prefs.putUChar("env_alpha", rfEnvironmentState.config.emaAlpha);
+    prefs.putUChar("env_hist", rfEnvironmentState.config.historyDepth);
+    prefs.putUChar("env_cmp_n", rfEnvironmentState.config.compareCount);
+    prefs.putBytes("env_cmp", rfEnvironmentState.config.compareChannels, sizeof(rfEnvironmentState.config.compareChannels));
+#if RF_LAB_TX_ENABLED
+    prefs.putUChar("prb_ch", rfEnvironmentState.config.probeChannel);
+    prefs.putUShort("prb_int", rfEnvironmentState.config.probeIntervalMs);
+    prefs.putUShort("prb_cnt", rfEnvironmentState.config.probePacketCount);
+    prefs.putUShort("prb_dur", rfEnvironmentState.config.probeMaxDurationSeconds);
+    prefs.putUChar("prb_size", rfEnvironmentState.config.probePayloadSize);
+    prefs.putUChar("prb_rate", rfEnvironmentState.config.probeDataRate);
+#endif
     prefs.end();
     settingsDirty = false;
 }
@@ -98,6 +134,7 @@ void AppState::factoryResetSettings() {
     analyzerTraceMode = ANALYZER_TRACE_LIVE;
     configureEventEngine(60, 10, 2, 1);
     memset(watchedChannels, 0, sizeof(watchedChannels));
+    rfEnvironmentState.config = RfEnvironmentConfig();
     setJammerTarget(JAM_TARGET_WIFI);
     saveSettings();
 }

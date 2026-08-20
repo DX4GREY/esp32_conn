@@ -26,6 +26,7 @@
 #include "services/SerialCommander.h"
 #include "services/SessionRecorder.h"
 #include "services/PerformanceMonitor.h"
+#include "services/RfEnvironmentAnalyzer.h"
 
 static constexpr unsigned long WAKE_HOLD_MS = 1500;
 
@@ -111,6 +112,7 @@ void setup() {
 // =============================================================================
 void loop() {
     performanceMonitor.tickLoop();
+    rfEnvironmentAnalyzer.service();
     // 1. Reset Watchdog Timer (Heartbeat)
     watchdog.feed();
 

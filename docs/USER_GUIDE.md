@@ -158,3 +158,10 @@ Choose Restart or Shutdown with `UP/DOWN`, confirm with `RIGHT`, or cancel with 
 ## Runtime versus persistent state
 
 Themes, profiles, event configuration, trace choice, watch markers, RF Test configuration, and CUSTOM depth are persisted. Freeze, zoom, cursor, baseline, histories, and recording state are runtime-only. See [Persistence](PERSISTENCE.md) for the exact schema.
+# RF Environment Test
+
+Open menu pages **ENV TEST** and **ENV MORE** with B. Occupancy, Heatmap, Bursts, Compare, RF Status, and Before/After use R to start/stop passive sampling and B to stop and return. Band Info uses Up/Down to inspect the possible Wi-Fi, BLE/Bluetooth, and Zigbee overlap at a frequency. “Possible/overlap/band region” does not mean a protocol was detected.
+
+Occupancy is the percentage of nRF24 carrier-detection samples that reported activity. Heatmap columns are circular history buckets and rows aggregate nearby RF channels. Before/After snapshots remain in RAM unless session recording is active.
+
+The Authorized RF Probe appears only in the lab build. Starting it is explicit; B is emergency stop. It sends bounded packets on one selected channel and automatically returns to RX.

@@ -20,7 +20,7 @@ struct MenuFeature {
 namespace MenuCatalog {
 
 constexpr int ITEMS_PER_PAGE = 6;
-constexpr int PAGE_COUNT = 2;
+constexpr int PAGE_COUNT = 4;
 constexpr int FEATURE_COUNT = ITEMS_PER_PAGE * PAGE_COUNT;
 
 const char* pageTitle(int page);

@@ -1,5 +1,7 @@
 #include "services/SessionRecorder.h"
 #include "core/AppState.h"
+#include "core/RfEnvironmentState.h"
+#include "drivers/RadioManager.h"
 #include <LittleFS.h>
 
 SessionRecorder sessionRecorder;
@@ -30,6 +32,9 @@ bool SessionRecorder::start() {
     }
     file.println("# RF24 analyzer session v1");
     file.println("# ACTIVITY values are carrier-hit percentages, not dBm");
+    file.printf("# firmware_build=%s compiled=%s %s\n", RF_LAB_TX_ENABLED ? "authorized_rf_lab" : "analyzer", __DATE__, __TIME__);
+    file.println("# E: type,ms,test,start_ms,duration_ms,radios,min_ch,max_ch,window_s,avg,peak_ch,peak_pct,score,bursts,top5");
+    file.println("# P: type,ms,channel,pa,data_rate,payload_size,packets,interval_ms,duration_ms");
     file.println("type,ms,sweep,peak_ch,peak_pct,confidence,band,mode,trace,ch0..ch125");
     file.close();
     pending.reserve(4096);
@@ -93,6 +98,23 @@ void SessionRecorder::recordSweep(const AppState& state) {
     pending += line;
     sweepCount++;
     if (pending.length() >= FLUSH_THRESHOLD) flushPending();
+}
+
+void SessionRecorder::recordEnvironmentSummary(const RfEnvironmentState& state, const char* testType) {
+    if (!recording) return;
+    uint8_t top[5]; state.topChannels(top, 5);
+    uint32_t bursts=0; for(int ch=0;ch<TOTAL_CHANNELS;ch++) bursts+=state.channels[ch].burstCount;
+    String line; line.reserve(240); line="E,"+String(millis())+","+testType+","+
+        String(state.startedMs)+","+String(millis()-state.startedMs)+","+
+        String(radioManager.availableRadioCount())+","+String(state.config.minChannel)+","+
+        String(state.config.maxChannel)+","+String(state.config.sampleWindowSeconds)+","+
+        String(state.averageOccupancy())+","+String(top[0])+","+
+        String(state.channels[top[0]].peak)+","+String(state.overallScore())+","+String(bursts);
+    for(int i=0;i<5;i++){line+=',';line+=String(top[i]);line+=':';line+=String(state.channels[top[i]].movingAverage);} line+='\n';
+    pending += line; if(pending.length()>=FLUSH_THRESHOLD) flushPending();
+}
+void SessionRecorder::recordProbeSummary(uint8_t channel,uint8_t pa,uint8_t rate,uint8_t size,uint16_t packets,uint16_t intervalMs,uint32_t durationMs){
+    if(!recording)return;pending += "P,"+String(millis())+","+String(channel)+","+String(pa)+","+String(rate)+","+String(size)+","+String(packets)+","+String(intervalMs)+","+String(durationMs)+"\n";
 }
 
 bool SessionRecorder::exportCsv(Stream& output) {

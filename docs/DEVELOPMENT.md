@@ -121,3 +121,8 @@ Update documentation whenever a change affects:
 - NVS keys or LittleFS formats;
 - safety boundaries;
 - test and release procedures.
+# Developing RF Environment Test
+
+Keep RF24 access inside `RadioManager`; new tasks must use its SPI mutex path. Do not allocate in the sampling hot loop. Pure statistics, scoring, mapping, ring rollover, and validation belong in `RfEnvironmentMath` so `pio test -e native` can exercise them without Arduino/RF24 hardware.
+
+Build both safety profiles with `pio run -e analyzer -e authorized_rf_lab`. Confirm the analyzer compile defines `RF_LAB_TX_ENABLED=0`, shows RX ONLY, and contains no callable probe command. Runtime tuning constants are intentionally percentages of carrier-hit activity, not calibrated measurements.

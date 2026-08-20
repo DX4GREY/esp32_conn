@@ -193,3 +193,8 @@ Before testing on hardware, also verify:
 - Shutdown returns to deep sleep after a short wake press and boots after a long press.
 
 The full automated, hardware, and release matrices are in [Testing and Release](TESTING.md).
+# RF Environment subsystem
+
+`RfEnvironmentAnalyzer` owns the Core 0 passive sampling task. It requests short carrier-sample batches through `RadioManager`, which retains ownership of RF24 objects and the shared SPI mutex. `RfEnvironmentState` contains fixed-size channel statistics, 32×126 history, 32 burst events, comparison configuration, and volatile snapshots. Pure calculations and mappings live in `RfEnvironmentMath`; UI only renders state and dispatches input. Settings use the existing delayed NVS service and session summaries use the recorder's buffered LittleFS path.
+
+The task runs at priority 2 with periodic one-tick yields. SPI is locked only for a 32-sample channel batch, and stop is checked between channels. Dual receivers observe the same channel for diversity; shared-SPI benchmarking should be done on hardware before changing to concurrent SPI transactions, which cannot run in parallel on this bus.

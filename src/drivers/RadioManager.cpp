@@ -369,6 +369,18 @@ void RadioManager::updatePALevel(rf24_pa_dbm_e pwr) {
     unlockRadioBus();
 }
 
+bool RadioManager::transmitProbePacket(uint8_t channel, uint8_t pa, uint8_t rate, uint8_t size, const uint8_t* payload) {
+#if !RF_LAB_TX_ENABLED
+    (void)channel;(void)pa;(void)rate;(void)size;(void)payload;return false;
+#else
+    if(!radio1Available||channel>125||pa>RF24_PA_MAX||(rate!=RF24_250KBPS&&rate!=RF24_1MBPS&&rate!=RF24_2MBPS)||size<1||size>32||payload==nullptr)return false;
+    if(!lockBus(pdMS_TO_TICKS(50)))return false;
+    radio.ce(LOW);radio.stopListening();radio.setChannel(channel);radio.setPALevel(static_cast<rf24_pa_dbm_e>(pa),true);
+    radio.setDataRate(static_cast<rf24_datarate_e>(rate));radio.setAutoAck(false);radio.setRetries(0,0);radio.setPayloadSize(size);radio.setCRCLength(RF24_CRC_16);
+    const bool ok=radio.write(payload,size,false);radio.ce(LOW);radio.flush_tx();radio.startListening();unlockBus();rxModeActive=true;return ok;
+#endif
+}
+
 bool RadioManager::isConnected() {
     return hasAnyRadio();
 }

@@ -56,3 +56,8 @@ The nRF24-based analyzer is not a calibrated spectrum analyzer, compliance recei
 ## Distribution recommendation
 
 Distribute or flash the `analyzer` artifact by default. Treat `authorized_rf_lab` artifacts as restricted laboratory builds, label them clearly, and do not make the lab profile the default environment.
+# RF Environment safety boundary
+
+`RF_LAB_TX_ENABLED=0` remains the default. All Environment analysis is passive and remains available in that build; probe TX members and commands are compile-gated. Carrier hits are displayed only as occupancy/relative activity/interference score—never dBm, RSSI, exact power, or protocol detection.
+
+The lab probe is limited to one channel, interval ≥20 ms, duration ≤60 s, packet count ≤1000, explicit start, responsive stop, and automatic RX restoration. It does not use `REUSE_TX_PL`, constant carrier, continuous CE-high operation, channel sweeping, or 100% duty cycle.

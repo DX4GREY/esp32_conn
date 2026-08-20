@@ -22,6 +22,8 @@ private:
     int settingsSelection = 0;
     int statusPage = 0;
     int powerSelection = 0;
+    uint8_t envEventScroll = 0;
+    uint8_t envBandChannel = 42;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -46,6 +48,7 @@ private:
     unsigned long lastInspectorRenderMs = 0;
     unsigned long lastJammerRenderMs = 0;
     unsigned long lastStatusRenderMs = 0;
+    unsigned long lastEnvRenderMs = 0;
 
     // Tracks page transitions separately from content changes. A full clear is
     // only needed when a different page replaces the current layout.
@@ -78,6 +81,7 @@ private:
     void renderSettingsScreen();
     void renderStatusScreen();
     void renderPowerScreen();
+    void renderRfEnvironmentScreen();
     void renderRebootScreen();
     void renderShutdownScreen();
 

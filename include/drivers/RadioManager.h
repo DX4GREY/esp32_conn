@@ -20,6 +20,8 @@ public:
     void enterTxMode();
     void scanSpectrum(void (*yieldCb)() = nullptr);
     uint8_t inspectChannel(int channel);
+    bool sampleCarrier(uint8_t channel, uint16_t requested, uint16_t& hits, uint16_t& samples);
+    bool transmitProbePacket(uint8_t channel, uint8_t pa, uint8_t rate, uint8_t size, const uint8_t* payload);
 
     // Utility
     void stopAll();

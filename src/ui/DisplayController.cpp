@@ -3,6 +3,9 @@
 #include "drivers/RadioManager.h"
 #include "ui/MenuCatalog.h"
 #include "services/SessionRecorder.h"
+#include "services/RfEnvironmentAnalyzer.h"
+#include "core/RfEnvironmentState.h"
+#include "services/RfAuthorizedProbe.h"
 
 void DisplayManager::updateUI() {
     const int currentMode = static_cast<int>(appState.appMode);
@@ -76,6 +79,18 @@ void DisplayManager::updateUI() {
             if (needRedraw) {
                 renderPowerScreen();
                 needRedraw = false;
+            }
+            break;
+        case APP_MODE_ENV_OCCUPANCY:
+        case APP_MODE_ENV_HEATMAP:
+        case APP_MODE_ENV_BURSTS:
+        case APP_MODE_ENV_COMPARE:
+        case APP_MODE_ENV_STATUS:
+        case APP_MODE_ENV_BEFORE_AFTER:
+        case APP_MODE_ENV_BAND_INFO:
+        case APP_MODE_ENV_PROBE:
+            if (needRedraw || millis() - lastEnvRenderMs >= 250) {
+                renderRfEnvironmentScreen(); lastEnvRenderMs = millis(); needRedraw = false;
             }
             break;
         case APP_MODE_REBOOT:
@@ -366,6 +381,32 @@ void DisplayManager::processInput() {
     // -------------------------------------------------------------------------
     // CONDITION 7: POWER OPTIONS
     // -------------------------------------------------------------------------
+    else if (appState.appMode >= APP_MODE_ENV_OCCUPANCY && appState.appMode <= APP_MODE_ENV_PROBE) {
+        if (buttonManager.isPressed(BTN_B)) {
+            rfEnvironmentAnalyzer.stop(); rfAuthorizedProbe.stop(); appState.appMode = APP_MODE_MENU; needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+            if (appState.appMode == APP_MODE_ENV_BEFORE_AFTER) {
+                if (!rfEnvironmentState.before.valid) {rfEnvironmentState.captureSnapshot(rfEnvironmentState.before);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"before");}
+                else {rfEnvironmentState.captureSnapshot(rfEnvironmentState.after);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"after");}
+            } else if (appState.appMode == APP_MODE_ENV_PROBE) {
+                if (rfAuthorizedProbe.isRunning()) rfAuthorizedProbe.stop(); else rfAuthorizedProbe.start();
+            } else if (appState.appMode != APP_MODE_ENV_BAND_INFO) {
+                if (rfEnvironmentState.running) rfEnvironmentAnalyzer.stop();
+                else rfEnvironmentAnalyzer.start(appState.appMode == APP_MODE_ENV_COMPARE ? RF_ENV_COMPARE : RF_ENV_OCCUPANCY);
+            }
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_UP)) {
+            if (appState.appMode == APP_MODE_ENV_BAND_INFO) envBandChannel = min<uint8_t>(125, envBandChannel + 1);
+            else if (appState.appMode == APP_MODE_ENV_BEFORE_AFTER) envBandChannel = min<uint8_t>(125, envBandChannel + 1);
+            else if (appState.appMode == APP_MODE_ENV_BURSTS && envEventScroll + 1 < rfEnvironmentState.eventCount) envEventScroll++;
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            if (appState.appMode == APP_MODE_ENV_BAND_INFO) envBandChannel = envBandChannel ? envBandChannel - 1 : 0;
+            else if (appState.appMode == APP_MODE_ENV_BEFORE_AFTER) envBandChannel = envBandChannel ? envBandChannel - 1 : 0;
+            else if (appState.appMode == APP_MODE_ENV_BURSTS && envEventScroll) envEventScroll--;
+            needRedraw = true;
+        }
+    }
     else if (appState.appMode == APP_MODE_POWER) {
         if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
             powerSelection = (powerSelection + 1) % 2;

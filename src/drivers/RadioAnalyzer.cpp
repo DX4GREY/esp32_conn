@@ -1,5 +1,16 @@
 #include "drivers/RadioManager.h"
 
+bool RadioManager::sampleCarrier(uint8_t channel, uint16_t requested, uint16_t& hits, uint16_t& samples) {
+    hits = samples = 0; if (!hasAnyRadio() || requested == 0) return false;
+    if (!rxModeActive) enterRxMode();
+    if (!lockBus(pdMS_TO_TICKS(20))) return false;
+    if (radio1Available) radio.setChannel(channel);
+    if (radio2Available) radio2.setChannel(channel);
+    delayMicroseconds(35);
+    for (uint16_t i=0;i<requested;i++) { const bool a=radio1Available&&(radio.testRPD()||radio.testCarrier()); const bool b=radio2Available&&(radio2.testRPD()||radio2.testCarrier()); if(a||b)hits++;samples++;delayMicroseconds(8); }
+    unlockBus(); return true;
+}
+
 void RadioManager::scanSpectrum(void (*yieldCb)()) {
     if (!hasAnyRadio()) return;
     if (!rxModeActive) {

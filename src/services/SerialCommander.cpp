@@ -4,6 +4,25 @@
 #include "ui/DisplayManager.h"
 #include "services/SessionRecorder.h"
 #include "services/PerformanceMonitor.h"
+#include "services/RfEnvironmentAnalyzer.h"
+#include "core/RfEnvironmentState.h"
+#include "core/RfEnvironmentMath.h"
+#include "services/RfAuthorizedProbe.h"
+
+namespace {
+bool parseIntStrict(const String& text, int& value) {
+    if (!text.length()) return false; char* end=nullptr; long v=strtol(text.c_str(),&end,10);
+    if (*end!='\0') return false; value=static_cast<int>(v); return true;
+}
+void printEnvHelp() {
+    Serial.println("env status | start occupancy | stop | window <1|5|10|30|60>");
+    Serial.println("env range <0..125> <0..125> | top | bursts | score");
+    Serial.println("env compare <2-4 channels> | snapshot <before|after>");
+#if RF_LAB_TX_ENABLED
+    Serial.println("env probe channel <ch> | interval <20..5000> | packets <1..1000> | duration <1..60> | size <1..32> | rate <250|1|2> | start | stop");
+#endif
+}
+}
 
 SerialCommander serialCommander;
 
@@ -28,7 +47,26 @@ void SerialCommander::executeCommand(String cmd) {
     String lowerCmd = cmd;
     lowerCmd.toLowerCase();
 
-    if (lowerCmd == "start") {
+    if (lowerCmd == "env" || lowerCmd == "env help") { printEnvHelp(); }
+    else if (lowerCmd.startsWith("env ")) {
+        String args=lowerCmd.substring(4); args.trim();
+        if(args=="status"){Serial.printf("ENV %s range=%u-%u window=%us cycles=%lu samples/s=%lu avg=%u%% score=%u/%s\n",rfEnvironmentState.running?"RUNNING":"STOPPED",rfEnvironmentState.config.minChannel,rfEnvironmentState.config.maxChannel,rfEnvironmentState.config.sampleWindowSeconds,(unsigned long)rfEnvironmentState.completedCycles,(unsigned long)rfEnvironmentState.samplesPerSecond,rfEnvironmentState.averageOccupancy(),rfEnvironmentState.overallScore(),rfEnvironmentState.scoreLabel(rfEnvironmentState.overallScore()));}
+        else if(args=="start occupancy"){if(rfEnvironmentAnalyzer.start()){appState.appMode=APP_MODE_ENV_OCCUPANCY;Serial.println("ENV occupancy started.");}else Serial.println("ENV start failed (busy or no radio). ");}
+        else if(args=="stop"){rfEnvironmentAnalyzer.stop();Serial.println("ENV stop requested.");}
+        else if(args.startsWith("window ")){int v;if(parseIntStrict(args.substring(7),v)&&rfEnvironmentAnalyzer.setWindow(v)){appState.markSettingsDirty();Serial.printf("ENV window=%ds\n",v);}else Serial.println("Invalid window. Use 1, 5, 10, 30, or 60.");}
+        else if(args.startsWith("range ")){int split=args.indexOf(' ',6),a,b;if(split>0&&parseIntStrict(args.substring(6,split),a)&&parseIntStrict(args.substring(split+1),b)&&rfEnvironmentAnalyzer.setRange(a,b)){appState.markSettingsDirty();Serial.printf("ENV range=%d-%d\n",a,b);}else Serial.println("Invalid range. Use: env range <0..125> <min..125>");}
+        else if(args=="top"){uint8_t top[5];rfEnvironmentState.topChannels(top,5);for(int i=0;i<5;i++)Serial.printf("%d. CH%u %u MHz %u%%\n",i+1,top[i],2400+top[i],rfEnvironmentState.channels[top[i]].movingAverage);}
+        else if(args=="bursts"){for(int i=0;i<rfEnvironmentState.eventCount;i++){int idx=(rfEnvironmentState.eventHead+RF_ENV_BURST_EVENTS-1-i)%RF_ENV_BURST_EVENTS;const auto&e=rfEnvironmentState.events[idx];Serial.printf("#%lu ms=%lu CH%u %uMHz peak=%u base=%u delta=%u severity=%s\n",(unsigned long)e.id,(unsigned long)e.timestampMs,e.channel,e.frequencyMHz,e.peak,e.baseline,e.delta,e.severity==RF_BURST_HIGH?"HIGH":e.severity==RF_BURST_MEDIUM?"MEDIUM":"LOW");}}
+        else if(args=="score"){uint8_t v=rfEnvironmentState.overallScore();Serial.printf("Interference score %u/100 %s (relative activity, not RF power)\n",v,rfEnvironmentState.scoreLabel(v));}
+        else if(args.startsWith("compare ")){String list=args.substring(8);uint8_t channels[4];int n=0;while(list.length()&&n<4){int sp=list.indexOf(' ');String tok=sp<0?list:list.substring(0,sp);int v;if(!parseIntStrict(tok,v)||v<0||v>125){n=0;break;}channels[n++]=v;if(sp<0){list="";break;}list=list.substring(sp+1);list.trim();}if(n>=2&&!list.length()){rfEnvironmentState.config.compareCount=n;memcpy(rfEnvironmentState.config.compareChannels,channels,n);appState.markSettingsDirty();Serial.printf("Compare configured with %d channels.\n",n);}else Serial.println("Invalid compare list. Provide 2-4 channels in range 0..125.");}
+        else if(args=="snapshot before"){rfEnvironmentState.captureSnapshot(rfEnvironmentState.before);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"before");Serial.println("Before snapshot captured.");}
+        else if(args=="snapshot after"){rfEnvironmentState.captureSnapshot(rfEnvironmentState.after);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"after");Serial.println("After snapshot captured.");}
+#if RF_LAB_TX_ENABLED
+        else if(args.startsWith("probe ")){String p=args.substring(6);if(p=="start")Serial.println(rfAuthorizedProbe.start()?"Authorized bounded probe started.":"Probe start rejected.");else if(p=="stop"){rfAuthorizedProbe.stop();Serial.println("Probe stop requested.");}else{int sp=p.indexOf(' '),v;String key=sp<0?p:p.substring(0,sp);String val=sp<0?"":p.substring(sp+1);if(!parseIntStrict(val,v)){Serial.println("Probe parameter requires an integer.");}else if(key=="channel"&&v>=0&&v<=125)rfEnvironmentState.config.probeChannel=v;else if(key=="interval"&&v>=20&&v<=5000)rfEnvironmentState.config.probeIntervalMs=v;else if(key=="packets"&&v>=1&&v<=1000)rfEnvironmentState.config.probePacketCount=v;else if(key=="duration"&&v>=1&&v<=60)rfEnvironmentState.config.probeMaxDurationSeconds=v;else if(key=="size"&&v>=1&&v<=32)rfEnvironmentState.config.probePayloadSize=v;else if(key=="rate"&&(v==250||v==1||v==2))rfEnvironmentState.config.probeDataRate=v==250?RF24_250KBPS:v==1?RF24_1MBPS:RF24_2MBPS;else{Serial.println("Invalid probe parameter/bounds.");return;}appState.markSettingsDirty();Serial.println("Probe setting updated.");}}
+#endif
+        else printEnvHelp();
+    }
+    else if (lowerCmd == "start") {
         radioManager.startJammer(appState.jammerTarget);
     }
     else if (lowerCmd == "stop") {
@@ -308,6 +346,7 @@ void SerialCommander::printHelp() {
     Serial.println("event <key> <value> - threshold/hysteresis/duration/channels");
     Serial.println("session <start|stop|info|export|replay> - LittleFS recorder");
     Serial.println("perf          - Runtime scan/UI/SPI timing diagnostics");
+    Serial.println("env help      - RF Environment Test commands");
     Serial.println("factory reset confirm - Restore persistent defaults and reboot");
     Serial.println("status       - Show system status and radio module");
     Serial.println("help         - Show this help");

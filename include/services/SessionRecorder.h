@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 struct AppState;
+class RfEnvironmentState;
 
 class SessionRecorder {
 public:
@@ -11,6 +12,10 @@ public:
     void stop();
     void service();
     void recordSweep(const AppState& state);
+    void recordEnvironmentSummary(const RfEnvironmentState& state, const char* testType);
+    void recordProbeSummary(uint8_t channel, uint8_t pa, uint8_t rate,
+                            uint8_t size, uint16_t packets, uint16_t intervalMs,
+                            uint32_t durationMs);
     bool exportCsv(Stream& output);
     bool replayLatest(AppState& state);
     bool isReady() const { return ready; }

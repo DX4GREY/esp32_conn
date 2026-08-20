@@ -2,6 +2,7 @@
 #include "ui/DisplaySupport.h"
 #include "drivers/RadioManager.h"
 #include "services/SessionRecorder.h"
+#include "core/RfEnvironmentMath.h"
 
 using namespace DisplayUi;
 
@@ -197,6 +198,13 @@ void DisplayManager::drawSpectrumBars() {
     tft.print(appState.getTraceLevel(appState.cursorChannel));
     tft.print(appState.watchedChannels[appState.cursorChannel] ? "%* Q" : "% Q");
     tft.print(appState.analyzerConfidence);
+    const uint16_t cursorMHz=RfEnvironmentMath::frequencyMHz(appState.cursorChannel);
+    const uint8_t regions=RfEnvironmentMath::protocolRegions(cursorMHz);
+    tft.print(" OV:");
+    const int8_t wifi=RfEnvironmentMath::wifiChannelForMHz(cursorMHz);
+    if(wifi>0){tft.print("W");tft.print(wifi);}
+    if(regions&4)tft.print("B");
+    if(regions&8)tft.print("Z");
 }
 
 void DisplayManager::renderSpectrumAnalyzer() {

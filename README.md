@@ -429,3 +429,8 @@ pio run -e authorized_rf_lab
 Keep pin definitions in `include/config/Config.h`, avoid full-screen redraws for dynamic updates, and document changes to Serial or NVS formats to preserve user compatibility.
 
 This repository currently has no separate license file. Add a `LICENSE` before distributing it under specific license terms.
+# RF Environment Test
+
+Firmware now includes a passive RF Environment Test subsystem: full/ranged nRF24 carrier-hit occupancy, 32-bucket heatmap, burst events, relative interference scoring, 2–4 channel comparison, before/after snapshots, and frequency-band overlap hints. Results are relative activity observations, not RSSI, dBm, calibrated RF power, or protocol detection.
+
+Use the `analyzer` profile for the default RX-only firmware. The optional `authorized_rf_lab` profile compiles a single-channel, bounded, low-duty probe (LOW power, 100 ms interval, 8-byte payload, 10-second default limit). It never uses continuous carrier or retransmit reuse.
