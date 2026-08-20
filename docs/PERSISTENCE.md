@@ -8,25 +8,37 @@ Configuration uses ESP32 Preferences namespace:
 appstate
 ```
 
-The current schema version is `2`.
+The current schema version is `4`.
 
 ## Stored keys
 
 | Key | Type | Default | Validation / meaning |
 |---|---|---|---|
-| `schema` | unsigned byte | `2` when first saved | Persistence schema version |
+| `schema` | unsigned byte | `4` when first saved | Persistence schema version |
 | `power` | integer | `RF24_PA_MAX` | Must be within RF24 PA enum range |
 | `dwell` | integer | `200` | Clamped to `10–10000` µs |
 | `target` | unsigned byte | Wi-Fi | Must be one of six target enums |
 | `profile` | unsigned byte | BALANCED | FAST, BALANCED, DEEP, or CUSTOM |
 | `custom` | integer | `40` | Clamped to `10–100` samples |
 | `theme` | unsigned byte | CYBER | Must be one of six themes |
+| `menu_view` | unsigned byte | GRID | GRID or LIST menu layout |
 | `trace` | unsigned byte | LIVE | LIVE, AVG, MAX, or DELTA; DELTA restores as LIVE |
 | `evt_thr` | unsigned byte | `60` | Clamped to `5–100` |
 | `evt_hys` | unsigned byte | `10` | Clamped to `0–threshold` |
 | `evt_dur` | unsigned byte | `2` | Clamped to `1–20` sweeps |
 | `evt_multi` | unsigned byte | `1` | Clamped to `1–16` channels |
 | `watch` | byte blob | all false | Exactly the size of the 126-entry watch array |
+| `env_win` | unsigned short | `10` | One of `1, 5, 10, 30, 60` seconds |
+| `env_min`, `env_max` | unsigned byte | `0`, `125` | Validated inclusive RF-channel range |
+| `env_burst` | unsigned byte | `25` | Burst delta threshold, clamped to `5–80` |
+| `env_alpha` | unsigned byte | `25` | EMA weight, clamped to `1–100` percent |
+| `env_hist` | unsigned byte | `32` | History depth, clamped to `8–32` |
+| `env_cmp_n` | unsigned byte | `2` | Comparison count, clamped to `2–4` |
+| `env_cmp` | 4-byte blob | `6, 11, 42, 80` | Comparison RF channels; invalid values use defaults |
+
+The lab build additionally stores `prb_ch`, `prb_int`, `prb_cnt`, `prb_dur`,
+`prb_size`, and `prb_rate`. The receive-only build neither loads nor writes
+these probe keys.
 
 ## Deferred writes
 
@@ -36,7 +48,11 @@ Explicit `saveSettings()` is used by factory reset. Shutdown currently does not 
 
 ## Migration
 
-Schema 0/legacy installations load keys that existed before schema versioning, use defaults for new keys, and schedule one deferred schema-2 save. Every loaded enum and numeric value is validated before use.
+Schema 0/legacy installations load the original keys. Schema 2 adds analyzer
+trace, event, and watch settings; schema 3 adds RF-environment and lab-probe
+settings; schema 4 adds the menu layout. Missing newer fields use defaults and
+schedule one deferred schema-4 save. Every loaded enum and numeric value is
+validated before use.
 
 Future migrations should:
 
@@ -63,7 +79,7 @@ It performs these actions:
 1. Stops radio activity and the recorder.
 2. Clears the `appstate` NVS namespace.
 3. Restores default power, dwell, theme, profile, custom depth, trace, event settings, watchlist, and target.
-4. Saves schema-2 defaults.
+4. Saves schema-4 defaults, including the RF-environment configuration and GRID layout.
 5. Reboots.
 
 Factory reset does not erase the LittleFS session file. Starting a new session replaces that file.
@@ -80,5 +96,6 @@ The following is intentionally not stored in NVS:
 - waterfall, survey totals, and event history;
 - recorder active state and runtime sweep count;
 - radio mutex performance counters.
+- RF-environment channel statistics, histories, burst events, and snapshots.
 
 This split prevents high-rate analyzer data from wearing NVS and avoids restoring environmental measurements that are no longer valid.

@@ -10,6 +10,7 @@ This directory is the detailed technical and operating reference for RF24 Suite.
 | [Hardware Reference](HARDWARE.md) | Builders | Wiring, buses, power, buttons, display, radio fallback, and wake circuit |
 | [User Guide](USER_GUIDE.md) | Device operators | Every menu, display field, button gesture, theme, status page, and shutdown flow |
 | [Analyzer Concepts](ANALYZER_CONCEPTS.md) | RF users and developers | Channel mapping, carrier-hit percentages, modes, traces, confidence, events, and limitations |
+| [RF Environment](RF_ENVIRONMENT.md) | RF users and test operators | Occupancy, heatmap, bursts, comparison, score, snapshots, band hints, CLI, and bounded probe |
 | [Data and Storage](DATA_AND_STORAGE.md) | Data users | Serial summaries, LittleFS session layout, buffering, limits, export, and replay |
 | [Serial CLI](SERIAL_CLI.md) | Operators and automation | Complete command reference with validation ranges and examples |
 

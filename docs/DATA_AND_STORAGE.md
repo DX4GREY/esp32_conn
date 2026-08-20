@@ -7,7 +7,8 @@
 | User configuration | NVS namespace `appstate` | Yes | Versioned schema and deferred writes |
 | Latest recorded session | LittleFS `/rf_session.csv` | Yes | Replaced when a new session starts |
 | Live, AVG, MAX, baseline | RAM | No | DELTA baseline is deliberately temporary |
-| Waterfall, survey, events | RAM | No | Rebuilt from new sweeps |
+| Waterfall, survey, analyzer events | RAM | No | Rebuilt from new sweeps |
+| RF-environment statistics, heatmap, bursts, snapshots | RAM | No | Configuration is persisted, measurements are not |
 | Recorder active state | RAM | No | Starts as stopped after boot |
 
 See [Persistence](PERSISTENCE.md) for NVS details.
@@ -67,11 +68,14 @@ Fields:
 
 ## LittleFS session format
 
-The file begins with:
+The file begins with metadata comments and a compact sweep header:
 
 ```text
 # RF24 analyzer session v1
 # ACTIVITY values are carrier-hit percentages, not dBm
+# firmware_build=<profile> compiled=<date> <time>
+# E: type,ms,test,start_ms,duration_ms,radios,min_ch,max_ch,window_s,avg,peak_ch,peak_pct,score,bursts,top5
+# P: type,ms,channel,pa,data_rate,payload_size,packets,interval_ms,duration_ms
 type,ms,sweep,peak_ch,peak_pct,confidence,band,mode,trace,ch0..ch125
 ```
 
@@ -92,6 +96,26 @@ The header uses `ch0..ch125` as compact notation; consumers must expand it to 12
 | `trace` | `0=LIVE`, `1=AVG`, `2=MAX`, `3=DELTA` |
 
 The 126 channel values always store the live `spectrumLevels`, regardless of the selected display trace.
+
+### Environment and probe rows
+
+When recording is active, stopping an environment run or capturing a snapshot
+adds an `E` row:
+
+```text
+E,<ms>,<test>,<start_ms>,<duration_ms>,<radios>,<min_ch>,<max_ch>,<window_s>,<avg>,<peak_ch>,<peak_pct>,<score>,<bursts>,<ch:pct>...
+```
+
+`test` is currently `occupancy`, `compare`, `before`, or `after`. Five trailing
+`channel:moving_average` values form the top-five list. In the lab build, a
+completed bounded probe adds a `P` row:
+
+```text
+P,<ms>,<channel>,<pa>,<data_rate>,<payload_size>,<packets>,<interval_ms>,<duration_ms>
+```
+
+`P` is compiled only into `authorized_rf_lab`. These rows share the same 256 KiB
+file limit and buffer as `S` rows.
 
 ## Export
 

@@ -4,14 +4,17 @@
 
 The TFT operates in 160 × 128 landscape orientation. Full-screen clearing occurs only when changing page layouts. Live screens update dirty graph columns, status fields, or cards to minimize flicker and SPI traffic.
 
-The main menu contains two pages of six cards arranged in a 2 × 3 grid.
+The main menu contains four pages: Analyze, Tools, ENV TEST, and ENV MORE.
+Analyze, Tools, and ENV TEST contain six items; ENV MORE contains two. Settings
+can render them as a 2 × 3 card grid or a four-row scrolling list.
 
 | Main-menu control | Action |
 |---|---|
 | `UP` / `DOWN` | Move selection between cards |
 | `RIGHT` | Open selected card |
-| `B` | Switch menu page |
-| Hold `UP` or `DOWN` | Alternative page switch |
+| `B` | Advance to the next menu page |
+| `UP` at the first item | Open the previous page at its last item |
+| `DOWN` at the last item | Open the next page at its first item |
 
 ## Analyze page
 
@@ -135,6 +138,7 @@ Use `UP/DOWN` to select and `RIGHT` to advance the value.
 | TX Power | MIN, LOW, HIGH, MAX | Relevant to the lab transmit profile; RX initialization uses maximum receiver PA/LNA configuration |
 | Sample Dwell | Preset microsecond values | Relevant to the lab transmit profile |
 | Display Theme | CYBER, OCEAN, AMBER, MATRIX, VIOLET, ICE | Changing theme forces one clean page rebuild, then partial rendering resumes |
+| Menu Layout | GRID, LIST | GRID uses cards; LIST shows four scrolling rows |
 
 ### Status
 
@@ -158,10 +162,8 @@ Choose Restart or Shutdown with `UP/DOWN`, confirm with `RIGHT`, or cancel with 
 ## Runtime versus persistent state
 
 Themes, profiles, event configuration, trace choice, watch markers, RF Test configuration, and CUSTOM depth are persisted. Freeze, zoom, cursor, baseline, histories, and recording state are runtime-only. See [Persistence](PERSISTENCE.md) for the exact schema.
-# RF Environment Test
+## RF Environment pages
 
-Open menu pages **ENV TEST** and **ENV MORE** with B. Occupancy, Heatmap, Bursts, Compare, RF Status, and Before/After use R to start/stop passive sampling and B to stop and return. Band Info uses Up/Down to inspect the possible Wi-Fi, BLE/Bluetooth, and Zigbee overlap at a frequency. “Possible/overlap/band region” does not mean a protocol was detected.
-
-Occupancy is the percentage of nRF24 carrier-detection samples that reported activity. Heatmap columns are circular history buckets and rows aggregate nearby RF channels. Before/After snapshots remain in RAM unless session recording is active.
-
-The Authorized RF Probe appears only in the lab build. Starting it is explicit; B is emergency stop. It sends bounded packets on one selected channel and automatically returns to RX.
+The ENV TEST and ENV MORE controls, metrics, limitations, Serial commands, and
+record formats are documented in [RF Environment](RF_ENVIRONMENT.md). Pressing
+`B` on an active environment screen requests a stop and returns to the menu.

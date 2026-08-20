@@ -23,6 +23,9 @@ The interface is designed for a 160 × 128 landscape display. It uses partial/di
 - 24-sweep waterfall with the newest data at the top.
 - Single-channel inspector with live activity and peak readings.
 - Channel survey showing the five channels with the highest average occupancy.
+- RF-environment toolkit with occupancy, heatmap history, burst detection,
+  channel comparison, relative interference scoring, before/after snapshots,
+  and protocol-band hints.
 - RF event detector with configurable threshold, hysteresis, duration, and multi-channel criteria.
 - Buffered LittleFS session recorder (256 KiB cap), USB CSV summary, export, and last-sweep replay.
 - `FAST`, `BALANCED`, `DEEP`, and `CUSTOM` analyzer profiles.
@@ -159,14 +162,17 @@ PlatformIO installs these dependencies automatically:
 
 ## User interface
 
-The main menu has two 2 × 3 grid pages. The last page and selected card remain in memory while the device is powered.
+The main menu has four pages. Pages 1–3 contain six items and page 4 contains
+two. Choose the `GRID` (2 × 3 cards) or `LIST` layout in Settings. The current
+page and selection remain in memory while the device is powered.
 
 | Control | Main-menu action |
 |---|---|
 | `UP` / `DOWN` | Move between feature cards |
 | `RIGHT` | Open the selected feature |
-| `B` | Switch between Analyze and Tools |
-| Hold `UP` or `DOWN` | Alternative page-switch gesture |
+| `B` | Advance to the next menu page |
+| `UP` at the first item | Move to the previous page and select its last item |
+| `DOWN` at the last item | Move to the next page and select its first item |
 
 ### Page 1 — Analyze
 
@@ -186,11 +192,33 @@ The main menu has two 2 × 3 grid pages. The last page and selected card remain 
 | RX Only / RF Test | RX-only notice in the default profile; controlled transmission screen in the lab profile | Lab profile: `UP/DOWN`: target, `RIGHT`: start or stop |
 | Radio Diag | Check Radio 1 and Radio 2 connectivity | `RIGHT`: refresh |
 | Profiles | Select analyzer sampling depth | `UP/DOWN`: profile, `RIGHT`: change CUSTOM value |
-| Settings | Configure RF power, dwell time, and display theme | `UP/DOWN`: select field, `RIGHT`: next value |
+| Settings | Configure RF power, dwell time, display theme, and Grid/List menu layout | `UP/DOWN`: select field, `RIGHT`: next value |
 | Status | Hardware, memory, radio/software, and performance data | `UP/DOWN`: page, `RIGHT`: refresh |
 | Power | Restart or enter deep sleep | `UP/DOWN`: option, `RIGHT`: confirm |
 
 Press `B` to return to the main menu from any feature screen.
+
+### Page 3 — ENV TEST
+
+| Feature | Purpose | Controls |
+|---|---|---|
+| Occupancy | Per-channel carrier-hit occupancy and top channels | `RIGHT`: start/stop sampling |
+| Heatmap | Circular time history across channel groups | `RIGHT`: start/stop sampling |
+| Bursts | Recent activity increases relative to the moving baseline | `RIGHT`: start/stop; `UP/DOWN`: browse events |
+| Compare | Compare 2–4 configured RF channels | `RIGHT`: start/stop sampling |
+| RF Status | Overall relative score, sample rate, cycles, and strongest channel | `RIGHT`: start/stop sampling |
+| BEF/AFT | Capture two in-RAM snapshots and display their difference | `RIGHT`: capture Before, then After; `UP/DOWN`: channel |
+
+### Page 4 — ENV MORE
+
+| Feature | Purpose | Controls |
+|---|---|---|
+| Band Info | Show possible Wi-Fi, BLE/Bluetooth, and Zigbee overlap at a frequency | `UP/DOWN`: RF channel |
+| RX Only / Auth Probe | RX-only notice, or bounded probe controls in the lab build | Lab build: `UP/DOWN`: field, `RIGHT`: change/action |
+
+The environment labels are frequency-region hints, not protocol detection, and
+all percentages and scores are relative carrier-detection metrics rather than
+calibrated RF power. See [RF Environment](docs/RF_ENVIRONMENT.md).
 
 ## Scan ranges, radio modes, and profiles
 

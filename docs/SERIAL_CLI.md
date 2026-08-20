@@ -61,6 +61,31 @@ Changing any event parameter clears per-channel run counters and releases the ev
 
 Unknown `session` actions currently fall back to the information output.
 
+## RF environment commands
+
+| Command | Behavior |
+|---|---|
+| `env` or `env help` | Print the environment command summary |
+| `env status` | Print running state, range, window, cycles, rate, average, and score |
+| `env start occupancy` | Start passive occupancy sampling and open its screen |
+| `env stop` | Request the environment analyzer to stop |
+| `env window <n>` | Set window to `1`, `5`, `10`, `30`, or `60` seconds |
+| `env range <min> <max>` | Set an inclusive range within RF channels `0–125` |
+| `env top` | Print the five channels with the highest moving average |
+| `env bursts` | Print retained burst events, newest first |
+| `env score` | Print the relative interference score and label |
+| `env compare <ch...>` | Persist a list of 2–4 channels in the range `0–125` |
+| `env snapshot before` | Capture the current Before snapshot |
+| `env snapshot after` | Capture the current After snapshot |
+
+The analyzer refuses to start if no radio is available or another run is busy.
+Changing window, range, or comparison channels is persisted after the normal
+1.5-second deferred-write interval. See [RF Environment](RF_ENVIRONMENT.md).
+
+In `authorized_rf_lab` only, `env probe` accepts `channel <0–125>`,
+`interval <20–5000>`, `packets <1–1000>`, `duration <1–60>`, `size <1–32>`,
+`rate <250|1|2>`, `start`, and `stop`. Rates mean 250 kbps, 1 Mbps, and 2 Mbps.
+
 ## RF-lab configuration commands
 
 These settings exist in both builds, but active transmission is compile-time disabled in `analyzer`.
