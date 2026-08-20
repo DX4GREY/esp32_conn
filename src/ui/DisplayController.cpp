@@ -82,14 +82,36 @@ void DisplayManager::updateUI() {
             }
             break;
         case APP_MODE_ENV_OCCUPANCY:
-        case APP_MODE_ENV_HEATMAP:
-        case APP_MODE_ENV_BURSTS:
         case APP_MODE_ENV_COMPARE:
         case APP_MODE_ENV_STATUS:
+            if (needRedraw || (rfEnvironmentState.running &&
+                millis() - lastEnvRenderMs >= 1000)) {
+                renderRfEnvironmentScreen(); lastEnvRenderMs = millis(); needRedraw = false;
+            }
+            break;
+        case APP_MODE_ENV_HEATMAP:
+            if (needRedraw || previousEnvHistoryHead != rfEnvironmentState.historyHead) {
+                renderRfEnvironmentScreen(); lastEnvRenderMs = millis(); needRedraw = false;
+                previousEnvHistoryHead = rfEnvironmentState.historyHead;
+            }
+            break;
+        case APP_MODE_ENV_BURSTS:
+            if (needRedraw || previousEnvEventHead != rfEnvironmentState.eventHead ||
+                previousEnvEventScroll != envEventScroll) {
+                renderRfEnvironmentScreen(); lastEnvRenderMs = millis(); needRedraw = false;
+                previousEnvEventHead = rfEnvironmentState.eventHead;
+                previousEnvEventScroll = envEventScroll;
+            }
+            break;
         case APP_MODE_ENV_BEFORE_AFTER:
         case APP_MODE_ENV_BAND_INFO:
+            if (needRedraw) {
+                renderRfEnvironmentScreen(); lastEnvRenderMs = millis(); needRedraw = false;
+            }
+            break;
         case APP_MODE_ENV_PROBE:
-            if (needRedraw || millis() - lastEnvRenderMs >= 250) {
+            if (needRedraw || (rfAuthorizedProbe.isRunning() &&
+                millis() - lastEnvRenderMs >= 500)) {
                 renderRfEnvironmentScreen(); lastEnvRenderMs = millis(); needRedraw = false;
             }
             break;

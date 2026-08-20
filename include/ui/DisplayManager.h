@@ -50,6 +50,21 @@ private:
     unsigned long lastJammerRenderMs = 0;
     unsigned long lastStatusRenderMs = 0;
     unsigned long lastEnvRenderMs = 0;
+    uint8_t previousEnvHistoryHead = 0xFF;
+    uint8_t previousEnvEventHead = 0xFF;
+    uint8_t previousEnvEventScroll = 0xFF;
+    uint8_t previousEnvTopChannels[5] = {0xFF,0xFF,0xFF,0xFF,0xFF};
+    uint8_t previousEnvTopLevels[5] = {0xFF,0xFF,0xFF,0xFF,0xFF};
+    uint8_t previousEnvAverage = 0xFF;
+    uint8_t previousEnvScore = 0xFF;
+    uint8_t previousCompareChannels[4] = {0xFF,0xFF,0xFF,0xFF};
+    uint8_t previousCompareLevels[4] = {0xFF,0xFF,0xFF,0xFF};
+    uint8_t previousCompareScores[4] = {0xFF,0xFF,0xFF,0xFF};
+    uint16_t previousEnvBursts = 0xFFFF;
+    uint8_t previousEnvPeakChannel = 0xFF;
+    uint8_t previousSnapshotChannel = 0xFF;
+    uint32_t previousBeforeCapturedMs = 0xFFFFFFFF;
+    uint32_t previousAfterCapturedMs = 0xFFFFFFFF;
     bool previousEnvRunning = false;
     bool envRunningStatusValid = false;
 
