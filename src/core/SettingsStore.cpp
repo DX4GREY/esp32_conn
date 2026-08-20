@@ -1,15 +1,19 @@
 #include "core/AppState.h"
 #include <Preferences.h>
 #include "core/RfEnvironmentState.h"
+#include "core/RfEnvironmentMath.h"
 
 namespace {
-constexpr uint8_t SETTINGS_SCHEMA_VERSION = 3;
+constexpr uint8_t SETTINGS_SCHEMA_VERSION = 4;
 constexpr unsigned long SETTINGS_SAVE_DELAY_MS = 1500;
 }
 
 void AppState::loadSettings() {
     Preferences prefs;
-    prefs.begin("appstate", false);
+    if (!prefs.begin("appstate", false)) {
+        setJammerTarget(jammerTarget);
+        return;
+    }
     const uint8_t storedSchema = prefs.getUChar("schema", 0);
 
     const int storedPower = prefs.getInt("power", DEFAULT_POWER);
@@ -48,7 +52,9 @@ void AppState::loadSettings() {
         }
     }
     if (storedSchema >= 3) {
-        rfEnvironmentState.config.sampleWindowSeconds = prefs.getUShort("env_win", 10);
+        const uint16_t storedWindow = prefs.getUShort("env_win", 10);
+        rfEnvironmentState.config.sampleWindowSeconds =
+            RfEnvironmentMath::validWindowSeconds(storedWindow) ? storedWindow : 10;
         rfEnvironmentState.config.minChannel = constrain(prefs.getUChar("env_min", 0), 0, 125);
         rfEnvironmentState.config.maxChannel = constrain(prefs.getUChar("env_max", 125), rfEnvironmentState.config.minChannel, 125);
         rfEnvironmentState.config.burstThreshold = constrain(prefs.getUChar("env_burst", 25), 5, 80);
@@ -57,6 +63,12 @@ void AppState::loadSettings() {
         if (prefs.getBytesLength("env_cmp") == sizeof(rfEnvironmentState.config.compareChannels))
             prefs.getBytes("env_cmp", rfEnvironmentState.config.compareChannels, sizeof(rfEnvironmentState.config.compareChannels));
         rfEnvironmentState.config.compareCount = constrain(prefs.getUChar("env_cmp_n", 2), 2, RF_ENV_COMPARE_MAX);
+        static const uint8_t defaultCompare[RF_ENV_COMPARE_MAX] = {6, 11, 42, 80};
+        for (uint8_t i = 0; i < RF_ENV_COMPARE_MAX; ++i) {
+            if (rfEnvironmentState.config.compareChannels[i] >= TOTAL_CHANNELS) {
+                rfEnvironmentState.config.compareChannels[i] = defaultCompare[i];
+            }
+        }
 #if RF_LAB_TX_ENABLED
         rfEnvironmentState.config.probeChannel = constrain(prefs.getUChar("prb_ch", 42), 0, 125);
         rfEnvironmentState.config.probeIntervalMs = constrain(prefs.getUShort("prb_int", 100), 20, 5000);
@@ -65,6 +77,10 @@ void AppState::loadSettings() {
         rfEnvironmentState.config.probePayloadSize = constrain(prefs.getUChar("prb_size", 8), 1, 32);
         { const uint8_t rate=prefs.getUChar("prb_rate",RF24_1MBPS); rfEnvironmentState.config.probeDataRate=(rate==RF24_250KBPS||rate==RF24_1MBPS||rate==RF24_2MBPS)?rate:RF24_1MBPS; }
 #endif
+    }
+    if (storedSchema >= 4) {
+        const uint8_t layout = prefs.getUChar("menu_view", MENU_LAYOUT_GRID);
+        menuLayout = layout < MENU_LAYOUT_COUNT ? static_cast<MenuLayout>(layout) : MENU_LAYOUT_GRID;
     }
     prefs.end();
 
@@ -83,6 +99,7 @@ void AppState::saveSettings() {
     prefs.putUChar("profile", static_cast<uint8_t>(scanProfile));
     prefs.putInt("custom", customSpectrumSamples);
     prefs.putUChar("theme", static_cast<uint8_t>(displayTheme));
+    prefs.putUChar("menu_view", static_cast<uint8_t>(menuLayout));
     prefs.putUChar("trace", static_cast<uint8_t>(analyzerTraceMode));
     prefs.putUChar("evt_thr", eventThreshold);
     prefs.putUChar("evt_hys", eventHysteresis);
@@ -129,6 +146,7 @@ void AppState::factoryResetSettings() {
     powerLevel = DEFAULT_POWER;
     dwellTimeUs = JAMMER_DWELL_US;
     displayTheme = DISPLAY_THEME_CYBER;
+    menuLayout = MENU_LAYOUT_GRID;
     scanProfile = SCAN_PROFILE_BALANCED;
     customSpectrumSamples = 40;
     analyzerTraceMode = ANALYZER_TRACE_LIVE;

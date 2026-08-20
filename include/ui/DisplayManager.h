@@ -19,6 +19,7 @@ private:
     Adafruit_ST7735 tft;
     int menuSelection = 0;
     int menuPage = 0;
+    int menuScrollOffset = 0;
     int settingsSelection = 0;
     int statusPage = 0;
     int powerSelection = 0;
@@ -32,6 +33,7 @@ private:
     // Partial-redraw support for main menu navigation
     bool menuNeedsPartialRedraw = false;
     int prevMenuSelection = 0;
+    int prevMenuScrollOffset = 0;
 
     // Dynamic-screen caches. Only changed pixels/regions are sent over SPI,
     // which avoids visible clearing and keeps the UI responsive.

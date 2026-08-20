@@ -26,6 +26,7 @@ struct AppState {
     rf24_datarate_e dataRate = DEFAULT_RATE;
     volatile int dwellTimeUs = JAMMER_DWELL_US;
     DisplayThemeId displayTheme = DISPLAY_THEME_CYBER;
+    MenuLayout menuLayout = MENU_LAYOUT_GRID;
 
     // ----- ANALYZER STATE -----
     AnalyzerBand analyzerBand = SCAN_BAND_ALL;
@@ -92,6 +93,8 @@ struct AppState {
     const char* getDwellTimeName() const;
     void cycleDisplayTheme(int direction = 1);
     const char* getDisplayThemeName() const;
+    void cycleMenuLayout(int direction = 1);
+    const char* getMenuLayoutName() const;
 
     void cycleAnalyzerBand(int direction = 1);
     const char* getAnalyzerBandName() const;

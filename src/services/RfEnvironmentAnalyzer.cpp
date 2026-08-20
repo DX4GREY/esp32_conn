@@ -28,9 +28,9 @@ void RfEnvironmentAnalyzer::run(){
             if(occ>s.peak)s.peak=occ;if(occ<s.minimum)s.minimum=occ;if(occ>s.maximum)s.maximum=occ;
             if(hits){s.lastActivityMs=millis();if(s.consecutiveActive<65535)s.consecutiveActive++;}else s.consecutiveActive=0;
             s.persistence=static_cast<uint8_t>(min<uint32_t>(100,(s.consecutiveActive*100U)/max<uint16_t>(1,rfEnvironmentState.config.sampleWindowSeconds*4U)));
-            uint8_t neighbors=0,n=0;for(int d=-2;d<=2;d++)if(d&&ch+d>=minCh&&ch+d<=maxCh){neighbors+=rfEnvironmentState.channels[ch+d].movingAverage;n++;}if(n)neighbors/=n;
+            uint16_t neighborTotal=0;uint8_t n=0;for(int d=-2;d<=2;d++)if(d&&ch+d>=minCh&&ch+d<=maxCh){neighborTotal+=rfEnvironmentState.channels[ch+d].movingAverage;n++;}const uint8_t neighbors=n?neighborTotal/n:0;
             uint8_t burstActivity=min<uint16_t>(100,s.burstCount*10);s.score=RfEnvironmentMath::interferenceScore(s.movingAverage,s.persistence,burstActivity,neighbors);
-            if(occ>baseline+rfEnvironmentState.config.burstThreshold&&baseline>0){RfBurstEvent &e=rfEnvironmentState.events[rfEnvironmentState.eventHead];e.id=++eventId;e.timestampMs=millis();e.channel=ch;e.frequencyMHz=2400+ch;e.peak=occ;e.baseline=baseline;e.delta=occ-baseline;e.durationMs=max<uint32_t>(1,micros()-cycleStart)/1000;e.severity=e.delta>=50?RF_BURST_HIGH:e.delta>=30?RF_BURST_MEDIUM:RF_BURST_LOW;s.burstCount++;rfEnvironmentState.eventHead=(rfEnvironmentState.eventHead+1)%RF_ENV_BURST_EVENTS;if(rfEnvironmentState.eventCount<RF_ENV_BURST_EVENTS)rfEnvironmentState.eventCount++;}
+            if(occ>baseline+rfEnvironmentState.config.burstThreshold&&baseline>0){RfBurstEvent &e=rfEnvironmentState.events[rfEnvironmentState.eventHead];e.id=++eventId;e.timestampMs=millis();e.channel=ch;e.frequencyMHz=2400+ch;e.peak=occ;e.baseline=baseline;e.delta=occ-baseline;e.durationMs=max<uint32_t>(1,(micros()-cycleStart)/1000U);e.severity=e.delta>=50?RF_BURST_HIGH:e.delta>=30?RF_BURST_MEDIUM:RF_BURST_LOW;s.burstCount++;rfEnvironmentState.eventHead=(rfEnvironmentState.eventHead+1)%RF_ENV_BURST_EVENTS;if(rfEnvironmentState.eventCount<RF_ENV_BURST_EVENTS)rfEnvironmentState.eventCount++;}
             if((ch&7)==0)vTaskDelay(1);
         }
         if(stopRequested)break;

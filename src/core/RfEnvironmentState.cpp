@@ -25,12 +25,25 @@ const char* RfEnvironmentState::scoreLabel(uint8_t score) const {
     return labels[RfEnvironmentMath::classifyScore(score)];
 }
 void RfEnvironmentState::topChannels(uint8_t* out, uint8_t count) const {
-    for (uint8_t i=0;i<count;i++) out[i]=config.minChannel;
-    for (uint8_t ch=config.minChannel; ch<=config.maxChannel; ++ch) {
-        for (uint8_t i=0;i<count;i++) if (channels[ch].movingAverage > channels[out[i]].movingAverage) {
-            for (uint8_t j=count-1;j>i;j--) out[j]=out[j-1]; out[i]=ch; break;
+    if (out == nullptr || count == 0) return;
+    const uint8_t available = static_cast<uint8_t>(config.maxChannel - config.minChannel + 1U);
+    const uint8_t rankedCount = min(count, available);
+    for (uint8_t i = 0; i < rankedCount; ++i) out[i] = config.minChannel + i;
+    for (uint16_t ch = config.minChannel; ch <= config.maxChannel; ++ch) {
+        bool alreadyRanked = false;
+        for (uint8_t i = 0; i < rankedCount; ++i) {
+            if (out[i] == ch) { alreadyRanked = true; break; }
+        }
+        if (alreadyRanked) continue;
+        for (uint8_t i = 0; i < rankedCount; ++i) {
+            if (channels[ch].movingAverage > channels[out[i]].movingAverage) {
+                for (uint8_t j = rankedCount - 1; j > i; --j) out[j] = out[j - 1];
+                out[i] = static_cast<uint8_t>(ch);
+                break;
+            }
         }
     }
+    for (uint8_t i = rankedCount; i < count; ++i) out[i] = config.minChannel;
 }
 void RfEnvironmentState::captureSnapshot(RfEnvironmentSnapshot& target) {
     target.valid=true; target.capturedMs=millis(); target.average=averageOccupancy(); target.score=overallScore();

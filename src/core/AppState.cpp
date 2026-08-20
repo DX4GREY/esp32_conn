@@ -203,3 +203,14 @@ const char* AppState::getDisplayThemeName() const {
         default:                   return "CYBER";
     }
 }
+
+void AppState::cycleMenuLayout(int direction) {
+    int current = static_cast<int>(menuLayout);
+    current = (current + direction + MENU_LAYOUT_COUNT) % MENU_LAYOUT_COUNT;
+    menuLayout = static_cast<MenuLayout>(current);
+    markSettingsDirty();
+}
+
+const char* AppState::getMenuLayoutName() const {
+    return menuLayout == MENU_LAYOUT_LIST ? "LIST" : "GRID";
+}

@@ -85,32 +85,34 @@ void DisplayManager::drawMenuIcon(int index, int centerX, int centerY,
 }
 
 void DisplayManager::drawMenuItem(int index, bool selected) {
-    constexpr int cardWidth = 74;
-    constexpr int cardHeight = 27;
-    const int column = index % 2;
-    const int row = index / 2;
     const int featureIndex = MenuCatalog::featureIndex(menuPage, index);
     const MenuFeature& feature = MenuCatalog::featureAt(menuPage, index);
-    const int x = 4 + column * 78;
-    const int y = 16 + row * 29;
+    const bool list = appState.menuLayout == MENU_LAYOUT_LIST;
+    const int visibleRow = index - menuScrollOffset;
+    if (list && (visibleRow < 0 || visibleRow >= 4)) return;
+    const int cardWidth = list ? (selected ? 150 : 138) : 74;
+    const int cardHeight = list ? 20 : 27;
+    const int x = list ? (selected ? 5 : 17) : 4 + (index % 2) * 78;
+    const int y = list ? 16 + visibleRow * 22 : 16 + (index / 2) * 29;
     const uint16_t background = selected ? SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
     const uint16_t border = selected ? SPECTRUM_ACCENT : SPECTRUM_BORDER;
     const uint16_t iconColor = selected ? SPECTRUM_ACCENT : ST77XX_GRAY;
 
     // Clear only this card's dirty rectangle before rebuilding it.
-    tft.fillRect(x, y, cardWidth, cardHeight, ST77XX_BLACK);
+    if (list) tft.fillRect(3, y, 154, cardHeight, ST77XX_BLACK);
+    else tft.fillRect(x, y, cardWidth, cardHeight, ST77XX_BLACK);
     tft.fillRoundRect(x, y, cardWidth, cardHeight, 4, background);
     tft.drawRoundRect(x, y, cardWidth, cardHeight, 4, border);
-    if (selected) {
-        tft.fillRoundRect(x + 2, y + 5, 3, 17, 1, SPECTRUM_ACCENT);
-    }
+    if (selected) tft.fillRoundRect(x + 2, y + (list ? 3 : 5), 3,
+                                    list ? 14 : 17, 1, SPECTRUM_ACCENT);
 
-    drawMenuIcon(feature.iconId, x + cardWidth / 2, y + 8,
+    drawMenuIcon(feature.iconId, list ? x + 20 : x + cardWidth / 2,
+                 list ? y + 10 : y + 8,
                  iconColor, background);
 
-    const int labelX = x +
+    const int labelX = list ? x + 39 : x +
         (cardWidth - static_cast<int>(strlen(feature.label)) * 6) / 2;
-    tft.setCursor(labelX, y + 17);
+    tft.setCursor(labelX, list ? y + 7 : y + 17);
     tft.setTextColor(selected ? ST77XX_WHITE : ST77XX_GRAY, background);
     tft.print(feature.label);
 
@@ -128,7 +130,13 @@ void DisplayManager::drawMenuItem(int index, bool selected) {
 // PARTIAL MENU REDRAW (only the two affected items)
 // =============================================================================
 void DisplayManager::redrawMenuItems(int oldSel, int newSel) {
-    if (oldSel != newSel) {
+    if (appState.menuLayout == MENU_LAYOUT_LIST &&
+        prevMenuScrollOffset != menuScrollOffset) {
+        tft.fillRect(0, 15, 160, 89, ST77XX_BLACK);
+        const int count = MenuCatalog::pageItemCount(menuPage);
+        for (int i = menuScrollOffset; i < min(count, menuScrollOffset + 4); ++i)
+            drawMenuItem(i, i == menuSelection);
+    } else if (oldSel != newSel) {
         drawMenuItem(oldSel, false);
         drawMenuItem(newSel, true);
     }
@@ -146,13 +154,15 @@ void DisplayManager::renderMainMenu() {
     tft.print("/");
     tft.print(MenuCatalog::PAGE_COUNT);
 
-    // Compact 2 x 3 grid. The viewport is cleared because page changes keep
-    // APP_MODE_MENU and the final page can contain fewer than six items.
+    // Both layouts share the same catalog and selection state. Clear only the
+    // viewport on page/layout changes; navigation remains partial.
     // Page changes keep APP_MODE_MENU, so clear the list viewport here to
     // remove rows left by a previous page with more items.
     tft.fillRect(0, 15, 160, 89, ST77XX_BLACK);
     const int count = MenuCatalog::pageItemCount(menuPage);
-    for (int i = 0; i < count; i++) {
+    const int first = appState.menuLayout == MENU_LAYOUT_LIST ? menuScrollOffset : 0;
+    const int last = appState.menuLayout == MENU_LAYOUT_LIST ? min(count, first + 4) : count;
+    for (int i = first; i < last; i++) {
         drawMenuItem(i, i == menuSelection);
     }
 

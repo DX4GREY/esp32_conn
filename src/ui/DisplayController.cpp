@@ -141,28 +141,39 @@ void DisplayManager::processInput() {
                            MenuCatalog::PAGE_COUNT;
                 menuSelection = MenuCatalog::pageItemCount(menuPage) - 1;
                 prevMenuSelection = menuSelection;
+                menuScrollOffset = appState.menuLayout == MENU_LAYOUT_LIST ?
+                    max(0, MenuCatalog::pageItemCount(menuPage) - 4) : 0;
+                prevMenuScrollOffset = menuScrollOffset;
                 needRedraw = true;
                 menuNeedsPartialRedraw = false;
                 return;
             }
             prevMenuSelection = menuSelection;
+            prevMenuScrollOffset = menuScrollOffset;
             menuSelection--;
+            if (appState.menuLayout == MENU_LAYOUT_LIST && menuSelection < menuScrollOffset)
+                menuScrollOffset = menuSelection;
             menuNeedsPartialRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
             const int itemCount = MenuCatalog::pageItemCount(menuPage);
             if (menuSelection == itemCount - 1) {
                 menuPage = (menuPage + 1) % MenuCatalog::PAGE_COUNT;
                 menuSelection = 0;
+                menuScrollOffset = prevMenuScrollOffset = 0;
                 needRedraw = true;
                 menuNeedsPartialRedraw = false;
                 return;
             }
             prevMenuSelection = menuSelection;
+            prevMenuScrollOffset = menuScrollOffset;
             menuSelection++;
+            if (appState.menuLayout == MENU_LAYOUT_LIST && menuSelection >= menuScrollOffset + 4)
+                menuScrollOffset = menuSelection - 3;
             menuNeedsPartialRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
             menuPage = (menuPage + 1) % MenuCatalog::PAGE_COUNT;
             menuSelection = 0;
+            menuScrollOffset = prevMenuScrollOffset = 0;
             prevMenuSelection = 0;
             needRedraw = true;
             menuNeedsPartialRedraw = false;
@@ -377,10 +388,10 @@ void DisplayManager::processInput() {
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_SETTINGS) {
         if (buttonManager.isPressed(BTN_UP)) {
-            settingsSelection = (settingsSelection + 2) % 3;
+            settingsSelection = (settingsSelection + 3) % 4;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
-            settingsSelection = (settingsSelection + 1) % 3;
+            settingsSelection = (settingsSelection + 1) % 4;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             if (settingsSelection == 0) {
@@ -388,11 +399,14 @@ void DisplayManager::processInput() {
                 radioManager.updatePALevel(appState.powerLevel);
             } else if (settingsSelection == 1) {
                 appState.cycleDwellTime(1);
-            } else {
+            } else if (settingsSelection == 2) {
                 appState.cycleDisplayTheme(1);
                 // Force one clean page rebuild so no pixels from the previous
                 // palette remain. Normal updates stay partial afterwards.
                 renderedMode = -1;
+            } else {
+                appState.cycleMenuLayout(1);
+                menuScrollOffset = prevMenuScrollOffset = 0;
             }
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {

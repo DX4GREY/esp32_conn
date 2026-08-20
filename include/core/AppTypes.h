@@ -78,6 +78,12 @@ enum DisplayThemeId {
     DISPLAY_THEME_COUNT
 };
 
+enum MenuLayout : uint8_t {
+    MENU_LAYOUT_GRID = 0,
+    MENU_LAYOUT_LIST,
+    MENU_LAYOUT_COUNT
+};
+
 constexpr int WATERFALL_ROWS = 24;
 constexpr int RF_EVENT_COUNT = 8;
 
