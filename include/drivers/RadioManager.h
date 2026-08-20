@@ -19,6 +19,7 @@ public:
     void enterRxMode();
     void enterTxMode();
     void scanSpectrum(void (*yieldCb)() = nullptr);
+    void requestScanAbort();
     uint8_t inspectChannel(int channel);
     bool sampleCarrier(uint8_t channel, uint16_t requested, uint16_t& hits, uint16_t& samples);
     bool transmitProbePacket(uint8_t channel, uint8_t pa, uint8_t rate, uint8_t size, const uint8_t* payload);
@@ -50,6 +51,8 @@ private:
     bool rxModeActive = false;
     TaskHandle_t jammerTaskHandle = NULL;
     volatile bool stopJam = false;
+    volatile bool scanActive = false;
+    volatile bool scanAbortRequested = false;
 
     bool lockBus(TickType_t timeout = pdMS_TO_TICKS(100));
     void unlockBus();

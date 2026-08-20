@@ -68,6 +68,7 @@ static void validateShutdownWakePress() {
 // Callback to keep buttons & UI responsive during scanning
 void yieldToUI() {
     displayManager.processInput();
+    displayManager.updateUI();
     watchdog.feed();
 }
 

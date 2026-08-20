@@ -17,6 +17,14 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
         enterRxMode();
     }
     if (!lockBus(pdMS_TO_TICKS(250))) return;
+    scanAbortRequested = false;
+    scanActive = true;
+    bool completed = true;
+    const AnalyzerBand scanBand = appState.analyzerBand;
+    auto abortPending = [&]() {
+        return scanAbortRequested || appState.analyzerFrozen ||
+               appState.analyzerBand != scanBand;
+    };
 
     int minCh, maxCh;
     appState.getAnalyzerChannelRange(minCh, maxCh);
@@ -42,6 +50,7 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
         // window. Shared SPI setup remains sequential, but RF observation is
         // parallel, reducing a full-band sweep to roughly half as many windows.
         for (int ch = minCh; ch <= maxCh; ch += 2) {
+            if (abortPending()) { completed = false; break; }
             const int ch2 = ch + 1;
             const bool hasSecondChannel = ch2 <= maxCh;
             radio.setChannel(ch);
@@ -51,10 +60,12 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
             int hits1 = 0;
             int hits2 = 0;
             for (int s = 0; s < sampleCount; s++) {
+                if ((s & 7) == 0 && abortPending()) { completed = false; break; }
                 if (radio.testRPD() || radio.testCarrier()) hits1++;
                 if (hasSecondChannel && (radio2.testRPD() || radio2.testCarrier())) hits2++;
                 delayMicroseconds(8);
             }
+            if (!completed) break;
 
             const uint8_t level1 = (hits1 * 100) / sampleCount;
             storeLevel(ch, level1, level1, 0);
@@ -63,10 +74,14 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
                 storeLevel(ch2, level2, 0, level2);
             }
 
-            if ((((ch - minCh) / 2) % 8 == 0) && yieldCb) yieldCb();
+            if ((((ch - minCh) / 2) % 8 == 0) && yieldCb) {
+                yieldCb();
+                if (abortPending()) { completed = false; break; }
+            }
         }
     } else {
         for (int ch = minCh; ch <= maxCh; ch++) {
+            if (abortPending()) { completed = false; break; }
             bool useRadio1 = radio1Available &&
                              appState.analyzerRadioMode != ANALYZER_RADIO_2;
             bool useRadio2 = radio2Available &&
@@ -85,6 +100,7 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
             int hits2 = 0;
             int combinedHits = 0;
             for (int s = 0; s < sampleCount; s++) {
+                if ((s & 7) == 0 && abortPending()) { completed = false; break; }
                 const bool hit1 = useRadio1 && (radio.testRPD() || radio.testCarrier());
                 const bool hit2 = useRadio2 && (radio2.testRPD() || radio2.testCarrier());
                 if (hit1) hits1++;
@@ -92,21 +108,32 @@ void RadioManager::scanSpectrum(void (*yieldCb)()) {
                 if (hit1 || hit2) combinedHits++;
                 delayMicroseconds(8);
             }
+            if (!completed) break;
 
             const uint8_t level1 = (hits1 * 100) / sampleCount;
             const uint8_t level2 = (hits2 * 100) / sampleCount;
             const uint8_t combined = (combinedHits * 100) / sampleCount;
             storeLevel(ch, combined, level1, level2);
 
-            if (((ch - minCh) % 16 == 0) && yieldCb) yieldCb();
+            if (((ch - minCh) % 16 == 0 && yieldCb)) {
+                yieldCb();
+                if (abortPending()) { completed = false; break; }
+            }
         }
     }
 
-    appState.peakChannel = highestCh;
-    appState.peakLevel = highestLvl;
-    appState.decayPeaks();
+    if (completed) {
+        appState.peakChannel = highestCh;
+        appState.peakLevel = highestLvl;
+        appState.decayPeaks();
+    } else if (scanAbortRequested) {
+        if (radio1Available) radio.stopListening();
+        if (radio2Available) radio2.stopListening();
+        rxModeActive = false;
+    }
     unlockBus();
-    appState.recordCompletedSweep(availableRadioCount());
+    scanActive = false;
+    if (completed) appState.recordCompletedSweep(availableRadioCount());
 }
 
 uint8_t RadioManager::inspectChannel(int channel) {

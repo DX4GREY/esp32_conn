@@ -232,14 +232,15 @@ void DisplayManager::processInput() {
             needRedraw = true;
         } else if (buttonManager.isShortReleased(BTN_UP)) {
             if (appState.analyzerFrozen) appState.setCursorChannel(appState.cursorChannel + 1, false);
-            else appState.cycleAnalyzerBand(1);
+            else { appState.cycleAnalyzerBand(1); radioManager.requestScanAbort(); }
             needRedraw = true;
         } else if (buttonManager.isShortReleased(BTN_DOWN)) {
             if (appState.analyzerFrozen) appState.setCursorChannel(appState.cursorChannel - 1, false);
-            else appState.cycleAnalyzerRadioMode(1);
+            else { appState.cycleAnalyzerRadioMode(1); radioManager.requestScanAbort(); }
             needRedraw = true;
         } else if (buttonManager.isShortReleased(BTN_RIGHT)) {
             appState.analyzerFrozen = !appState.analyzerFrozen;
+            if (appState.analyzerFrozen) radioManager.requestScanAbort();
             if (!appState.analyzerFrozen) appState.cursorFollowsPeak = true;
             needRedraw = true;
         } else if (buttonManager.isShortReleased(BTN_B)) {

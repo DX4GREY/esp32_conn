@@ -41,6 +41,7 @@ private:
     int previousHeaderPeakChannel = -1;
     uint8_t previousHeaderRadio1Level = 0xFF;
     uint8_t previousHeaderRadio2Level = 0xFF;
+    int previousSpectrumCursorX = -1;
     uint8_t previousInspectedLevel = 0xFF;
     uint8_t previousInspectedPeak = 0xFF;
     bool previousCarrierDetected = false;

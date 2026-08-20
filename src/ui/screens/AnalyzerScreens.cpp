@@ -62,11 +62,11 @@ void DisplayManager::drawSpectrumGrid() {
     tft.print(appState.analyzerZoom);
 
     tft.fillRect(0, 105, 160, 23, ST77XX_BLACK);
-    drawFooterChip(2, 37, "U BAND");
+    drawFooterChip(2, 37, appState.analyzerFrozen ? "U CH+" : "U BAND");
     String modeChip = "D ";
-    modeChip += appState.getAnalyzerRadioModeName();
+    modeChip += appState.analyzerFrozen ? "CH-" : appState.getAnalyzerRadioModeName();
     drawFooterChip(41, 37, modeChip.c_str());
-    drawFooterChip(80, 37, "R HOLD");
+    drawFooterChip(80, 37, appState.analyzerFrozen ? "R LIVE" : "R HOLD");
     drawFooterChip(119, 39, "B BACK");
 }
 
@@ -75,9 +75,7 @@ void DisplayManager::drawSpectrumBars() {
     const uint8_t peakRadio2 = appState.radio2Levels[appState.peakChannel];
     // Header is redrawn only when its displayed value changes.
     if (previousHeaderPeakChannel != appState.peakChannel ||
-        previousHeaderPeakLevel != appState.peakLevel ||
-        previousHeaderRadio1Level != peakRadio1 ||
-        previousHeaderRadio2Level != peakRadio2) {
+        previousHeaderPeakLevel != appState.peakLevel) {
         tft.fillRect(99, 1, 61, 11, SPECTRUM_HEADER_BG);
         tft.setCursor(99, 3);
         tft.setTextColor(ST77XX_GRAY, SPECTRUM_HEADER_BG);
@@ -90,20 +88,6 @@ void DisplayManager::drawSpectrumBars() {
         previousHeaderPeakChannel = appState.peakChannel;
         previousHeaderPeakLevel = appState.peakLevel;
 
-        tft.fillRect(18, 95, 126, 8, ST77XX_BLACK);
-        String radioSummary;
-        if (appState.analyzerRadioMode == ANALYZER_RADIO_FAST) {
-            radioSummary = "FAST  R1/R2 SPLIT";
-        } else if (appState.analyzerRadioMode == ANALYZER_RADIO_DIVERSITY) {
-            radioSummary = "R1:" + String(peakRadio1) + "% R2:" + String(peakRadio2) + "%";
-        } else if (appState.analyzerRadioMode == ANALYZER_RADIO_1) {
-            radioSummary = "RADIO 1  " + String(peakRadio1) + "%";
-        } else {
-            radioSummary = "RADIO 2  " + String(peakRadio2) + "%";
-        }
-        tft.setCursor(centeredTextX(radioSummary), 95);
-        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
-        tft.print(radioSummary);
         previousHeaderRadio1Level = peakRadio1;
         previousHeaderRadio2Level = peakRadio2;
     }
@@ -116,6 +100,20 @@ void DisplayManager::drawSpectrumBars() {
                                      max(bandMin, bandMax - visibleCount + 1));
     const int visibleMax = min(bandMax, visibleMin + visibleCount - 1);
     const int visibleSpan = max(1, visibleMax - visibleMin);
+    const int cursorX = GRAPH_X_START +
+        ((constrain(appState.cursorChannel, visibleMin, visibleMax) - visibleMin) *
+         (GRAPH_WIDTH - 1)) / visibleSpan;
+
+    // Force only the old cursor columns dirty. This restores the graph pixels
+    // under the previous triangle without repainting the complete chart.
+    if (previousSpectrumCursorX >= GRAPH_X_START &&
+        previousSpectrumCursorX != cursorX) {
+        const int oldPixel = previousSpectrumCursorX - GRAPH_X_START;
+        for (int p = max(0, oldPixel - 2); p <= min(GRAPH_WIDTH - 1, oldPixel + 2); ++p) {
+            previousSpectrumLevels[p] = 0xFF;
+            previousPeakLevels[p] = 0xFF;
+        }
+    }
 
     tft.startWrite();
     for (int pixel = 0; pixel < GRAPH_WIDTH; pixel++) {
@@ -180,27 +178,24 @@ void DisplayManager::drawSpectrumBars() {
     }
     tft.endWrite();
 
-    const int cursorX = GRAPH_X_START +
-        ((constrain(appState.cursorChannel, visibleMin, visibleMax) - visibleMin) *
-         (GRAPH_WIDTH - 1)) / visibleSpan;
     tft.fillTriangle(cursorX - 2, GRAPH_Y_TOP, cursorX + 2, GRAPH_Y_TOP,
                      cursorX, GRAPH_Y_TOP + 3, ST77XX_WHITE);
+    previousSpectrumCursorX = cursorX;
 
     tft.fillRect(17, 95, 128, 8, ST77XX_BLACK);
     tft.setCursor(18, 95);
     tft.setTextColor(appState.analyzerFrozen ? SPECTRUM_HIGH : ST77XX_GRAY,
                      ST77XX_BLACK);
-    tft.print(appState.analyzerFrozen ? "HOLD " : "C ");
+    tft.print(appState.analyzerFrozen ? "H " : "L ");
     tft.print(appState.cursorChannel);
     tft.print("/");
     tft.print(2400 + appState.cursorChannel);
     tft.print(" ");
     tft.print(appState.getTraceLevel(appState.cursorChannel));
-    tft.print(appState.watchedChannels[appState.cursorChannel] ? "%* Q" : "% Q");
-    tft.print(appState.analyzerConfidence);
+    tft.print(appState.watchedChannels[appState.cursorChannel] ? "%*" : "%");
     const uint16_t cursorMHz=RfEnvironmentMath::frequencyMHz(appState.cursorChannel);
     const uint8_t regions=RfEnvironmentMath::protocolRegions(cursorMHz);
-    tft.print(" OV:");
+    tft.print(" ");
     const int8_t wifi=RfEnvironmentMath::wifiChannelForMHz(cursorMHz);
     if(wifi>0){tft.print("W");tft.print(wifi);}
     if(regions&4)tft.print("B");
@@ -216,6 +211,7 @@ void DisplayManager::renderSpectrumAnalyzer() {
         previousHeaderPeakLevel = 0xFF;
         previousHeaderRadio1Level = 0xFF;
         previousHeaderRadio2Level = 0xFF;
+        previousSpectrumCursorX = -1;
         needRedraw = false;
     }
 

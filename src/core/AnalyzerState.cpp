@@ -8,6 +8,14 @@ void AppState::cycleAnalyzerBand(int direction) {
     current = (current + direction + total) % total;
     analyzerBand = (AnalyzerBand)current;
     resetPeaks();
+    int minCh, maxCh;
+    getAnalyzerChannelRange(minCh, maxCh);
+    cursorChannel = constrain(cursorChannel, minCh, maxCh);
+    peakChannel = cursorChannel;
+    peakLevel = 0;
+    memset(waterfall, 0, sizeof(waterfall));
+    waterfallHead = 0;
+    waterfallCount = 0;
 }
 
 const char* AppState::getAnalyzerBandName() const {

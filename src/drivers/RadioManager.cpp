@@ -353,6 +353,12 @@ void RadioManager::stopJammer() {
 
 void RadioManager::stopAll() {
     stopJammer();
+    scanAbortRequested = true;
+    // scanSpectrum owns this same non-recursive mutex. When stopAll() is
+    // invoked from its UI yield callback, waiting here would self-block until
+    // timeout. The scan loop observes the flag within a few samples and does
+    // the RX shutdown before releasing the bus.
+    if (scanActive) return;
     if (lockRadioBus()) {
         if (radio1Available) radio.stopListening();
         if (radio2Available) radio2.stopListening();
@@ -360,6 +366,8 @@ void RadioManager::stopAll() {
     }
     rxModeActive = false;
 }
+
+void RadioManager::requestScanAbort() { scanAbortRequested = true; }
 
 void RadioManager::updatePALevel(rf24_pa_dbm_e pwr) {
     appState.powerLevel = pwr;

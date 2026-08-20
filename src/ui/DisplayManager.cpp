@@ -17,6 +17,7 @@ void DisplayManager::resetDynamicCaches() {
     previousHeaderPeakChannel = -1;
     previousHeaderRadio1Level = 0xFF;
     previousHeaderRadio2Level = 0xFF;
+    previousSpectrumCursorX = -1;
     previousInspectedLevel = 0xFF;
     previousInspectedPeak = 0xFF;
     carrierStatusValid = false;
