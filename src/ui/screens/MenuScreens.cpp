@@ -101,7 +101,9 @@ void DisplayManager::drawMenuItem(int index, bool selected) {
     tft.fillRect(x, y, cardWidth, cardHeight, ST77XX_BLACK);
     tft.fillRoundRect(x, y, cardWidth, cardHeight, 4, background);
     tft.drawRoundRect(x, y, cardWidth, cardHeight, 4, border);
-    if (selected) tft.fillRoundRect(x + 2, y + 5, 3, 17, 1, SPECTRUM_ACCENT);
+    if (selected) {
+        tft.fillRoundRect(x + 2, y + 5, 3, 17, 1, SPECTRUM_ACCENT);
+    }
 
     drawMenuIcon(feature.iconId, x + cardWidth / 2, y + 8,
                  iconColor, background);
@@ -144,8 +146,13 @@ void DisplayManager::renderMainMenu() {
     tft.print("/");
     tft.print(MenuCatalog::PAGE_COUNT);
 
-    // Six compact feature cards in a 2 x 3 grid.
-    for (int i = 0; i < MenuCatalog::ITEMS_PER_PAGE; i++) {
+    // Compact 2 x 3 grid. The viewport is cleared because page changes keep
+    // APP_MODE_MENU and the final page can contain fewer than six items.
+    // Page changes keep APP_MODE_MENU, so clear the list viewport here to
+    // remove rows left by a previous page with more items.
+    tft.fillRect(0, 15, 160, 89, ST77XX_BLACK);
+    const int count = MenuCatalog::pageItemCount(menuPage);
+    for (int i = 0; i < count; i++) {
         drawMenuItem(i, i == menuSelection);
     }
 

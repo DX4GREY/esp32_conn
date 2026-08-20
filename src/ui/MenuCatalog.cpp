@@ -19,7 +19,7 @@ constexpr MenuFeature FEATURES[MenuCatalog::FEATURE_COUNT] = {
     {"RADIO DIAG",APP_MODE_RADIO_DIAG,         7, MENU_OPEN_NONE},
     {"PROFILES",  APP_MODE_PROFILES,           8, MENU_OPEN_NONE},
     {"SETTINGS",  APP_MODE_SETTINGS,           9, MENU_OPEN_NONE},
-    {"STATUS",    APP_MODE_STATUS,             10, MENU_OPEN_NONE},
+    {"SYS INFO",  APP_MODE_STATUS,             10, MENU_OPEN_NONE},
     {"POWER",     APP_MODE_POWER,              11, MENU_OPEN_STOP_RADIOS}
     ,{"OCCUPANCY",APP_MODE_ENV_OCCUPANCY,      0, MENU_OPEN_STOP_RADIOS}
     ,{"HEATMAP",  APP_MODE_ENV_HEATMAP,        1, MENU_OPEN_STOP_RADIOS}
@@ -33,10 +33,6 @@ constexpr MenuFeature FEATURES[MenuCatalog::FEATURE_COUNT] = {
 #else
     ,{"RX ONLY",  APP_MODE_ENV_PROBE,          6, MENU_OPEN_STOP_RADIOS}
 #endif
-    ,{"SPECTRUM", APP_MODE_ANALYZER_SPECTRUM, 0, MENU_OPEN_STOP_RADIOS}
-    ,{"SURVEY",   APP_MODE_SURVEY,             3, MENU_OPEN_STOP_RADIOS}
-    ,{"RADIO DIAG",APP_MODE_RADIO_DIAG,        7, MENU_OPEN_NONE}
-    ,{"SETTINGS", APP_MODE_SETTINGS,           9, MENU_OPEN_NONE}
 };
 
 constexpr const char* PAGE_TITLES[MenuCatalog::PAGE_COUNT] = {
@@ -45,6 +41,8 @@ constexpr const char* PAGE_TITLES[MenuCatalog::PAGE_COUNT] = {
     "ENV TEST",
     "ENV MORE"
 };
+
+constexpr uint8_t PAGE_ITEM_COUNTS[MenuCatalog::PAGE_COUNT] = {6, 6, 6, 2};
 
 }  // namespace
 
@@ -60,6 +58,10 @@ const MenuFeature& featureAt(int page, int slot) {
 
 const char* pageTitle(int page) {
     return PAGE_TITLES[page];
+}
+
+int pageItemCount(int page) {
+    return PAGE_ITEM_COUNTS[constrain(page, 0, PAGE_COUNT - 1)];
 }
 
 }  // namespace MenuCatalog

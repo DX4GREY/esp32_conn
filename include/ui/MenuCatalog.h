@@ -21,9 +21,10 @@ namespace MenuCatalog {
 
 constexpr int ITEMS_PER_PAGE = 6;
 constexpr int PAGE_COUNT = 4;
-constexpr int FEATURE_COUNT = ITEMS_PER_PAGE * PAGE_COUNT;
+constexpr int FEATURE_COUNT = 20;
 
 const char* pageTitle(int page);
+int pageItemCount(int page);
 const MenuFeature& featureAt(int page, int slot);
 int featureIndex(int page, int slot);
 

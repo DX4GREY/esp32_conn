@@ -110,21 +110,38 @@ void DisplayManager::processInput() {
     // CONDITION 1: MAIN MENU
     // -------------------------------------------------------------------------
     if (appState.appMode == APP_MODE_MENU) {
-        if (buttonManager.isLongPressed(BTN_UP) || buttonManager.isLongPressed(BTN_DOWN)) {
-            menuPage = (menuPage + 1) % MenuCatalog::PAGE_COUNT;
-            needRedraw = true;
-            menuNeedsPartialRedraw = false;
-        } else if (buttonManager.isPressed(BTN_UP)) {
+        // Page changes are intentionally edge-triggered only. Using the same
+        // DOWN press for both an edge and a later long-press event can advance
+        // two pages when the button is held near the threshold.
+        if (buttonManager.isPressed(BTN_UP)) {
+            if (menuSelection == 0) {
+                menuPage = (menuPage - 1 + MenuCatalog::PAGE_COUNT) %
+                           MenuCatalog::PAGE_COUNT;
+                menuSelection = MenuCatalog::pageItemCount(menuPage) - 1;
+                prevMenuSelection = menuSelection;
+                needRedraw = true;
+                menuNeedsPartialRedraw = false;
+                return;
+            }
             prevMenuSelection = menuSelection;
-            menuSelection = (menuSelection - 1 + MenuCatalog::ITEMS_PER_PAGE) %
-                            MenuCatalog::ITEMS_PER_PAGE;
+            menuSelection--;
             menuNeedsPartialRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
+            const int itemCount = MenuCatalog::pageItemCount(menuPage);
+            if (menuSelection == itemCount - 1) {
+                menuPage = (menuPage + 1) % MenuCatalog::PAGE_COUNT;
+                menuSelection = 0;
+                needRedraw = true;
+                menuNeedsPartialRedraw = false;
+                return;
+            }
             prevMenuSelection = menuSelection;
-            menuSelection = (menuSelection + 1) % MenuCatalog::ITEMS_PER_PAGE;
+            menuSelection++;
             menuNeedsPartialRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
             menuPage = (menuPage + 1) % MenuCatalog::PAGE_COUNT;
+            menuSelection = 0;
+            prevMenuSelection = 0;
             needRedraw = true;
             menuNeedsPartialRedraw = false;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
@@ -389,19 +406,32 @@ void DisplayManager::processInput() {
                 if (!rfEnvironmentState.before.valid) {rfEnvironmentState.captureSnapshot(rfEnvironmentState.before);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"before");}
                 else {rfEnvironmentState.captureSnapshot(rfEnvironmentState.after);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"after");}
             } else if (appState.appMode == APP_MODE_ENV_PROBE) {
-                if (rfAuthorizedProbe.isRunning()) rfAuthorizedProbe.stop(); else rfAuthorizedProbe.start();
+                if (probeSelection == 4) {
+                    if (rfAuthorizedProbe.isRunning()) rfAuthorizedProbe.stop(); else rfAuthorizedProbe.start();
+#if RF_LAB_TX_ENABLED
+                } else if (!rfAuthorizedProbe.isRunning()) {
+                    auto &c = rfEnvironmentState.config;
+                    if (probeSelection == 0) c.probeChannel = (c.probeChannel + 1) % 126;
+                    else if (probeSelection == 1) c.probeIntervalMs = c.probeIntervalMs >= 1000 ? 20 : (c.probeIntervalMs < 100 ? c.probeIntervalMs + 20 : c.probeIntervalMs + 100);
+                    else if (probeSelection == 2) c.probePacketCount = c.probePacketCount >= 1000 ? 10 : min<uint16_t>(1000, c.probePacketCount + 10);
+                    else if (probeSelection == 3) c.probeMaxDurationSeconds = c.probeMaxDurationSeconds >= 60 ? 1 : min<uint16_t>(60, c.probeMaxDurationSeconds + 5);
+                    appState.markSettingsDirty();
+#endif
+                }
             } else if (appState.appMode != APP_MODE_ENV_BAND_INFO) {
                 if (rfEnvironmentState.running) rfEnvironmentAnalyzer.stop();
                 else rfEnvironmentAnalyzer.start(appState.appMode == APP_MODE_ENV_COMPARE ? RF_ENV_COMPARE : RF_ENV_OCCUPANCY);
             }
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_UP)) {
-            if (appState.appMode == APP_MODE_ENV_BAND_INFO) envBandChannel = min<uint8_t>(125, envBandChannel + 1);
+            if (appState.appMode == APP_MODE_ENV_PROBE) probeSelection = (probeSelection + 4) % 5;
+            else if (appState.appMode == APP_MODE_ENV_BAND_INFO) envBandChannel = min<uint8_t>(125, envBandChannel + 1);
             else if (appState.appMode == APP_MODE_ENV_BEFORE_AFTER) envBandChannel = min<uint8_t>(125, envBandChannel + 1);
             else if (appState.appMode == APP_MODE_ENV_BURSTS && envEventScroll + 1 < rfEnvironmentState.eventCount) envEventScroll++;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
-            if (appState.appMode == APP_MODE_ENV_BAND_INFO) envBandChannel = envBandChannel ? envBandChannel - 1 : 0;
+            if (appState.appMode == APP_MODE_ENV_PROBE) probeSelection = (probeSelection + 1) % 5;
+            else if (appState.appMode == APP_MODE_ENV_BAND_INFO) envBandChannel = envBandChannel ? envBandChannel - 1 : 0;
             else if (appState.appMode == APP_MODE_ENV_BEFORE_AFTER) envBandChannel = envBandChannel ? envBandChannel - 1 : 0;
             else if (appState.appMode == APP_MODE_ENV_BURSTS && envEventScroll) envEventScroll--;
             needRedraw = true;

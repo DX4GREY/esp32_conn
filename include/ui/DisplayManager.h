@@ -24,6 +24,7 @@ private:
     int powerSelection = 0;
     uint8_t envEventScroll = 0;
     uint8_t envBandChannel = 42;
+    uint8_t probeSelection = 0;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -49,6 +50,8 @@ private:
     unsigned long lastJammerRenderMs = 0;
     unsigned long lastStatusRenderMs = 0;
     unsigned long lastEnvRenderMs = 0;
+    bool previousEnvRunning = false;
+    bool envRunningStatusValid = false;
 
     // Tracks page transitions separately from content changes. A full clear is
     // only needed when a different page replaces the current layout.
