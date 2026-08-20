@@ -10,7 +10,10 @@ using namespace DisplayUi;
 void DisplayManager::renderRfEnvironmentScreen() {
     const uint16_t bg=SPECTRUM_CARD_BG, accent=SPECTRUM_ACCENT;
     (void)bg;
-    const bool layout = needRedraw;
+    // Input changes also set needRedraw, so it cannot identify a page-layout
+    // transition. Keep an independent layout flag: static chrome is drawn once
+    // after entering the page, while subsequent renders update dirty regions.
+    const bool layout = !envLayoutDrawn;
     auto clearLine = [&](int y) { tft.fillRect(2, y, 156, 9, ST77XX_BLACK); };
     if(appState.appMode==APP_MODE_ENV_OCCUPANCY){
         if(layout){drawModernHeader("CHANNEL OCCUPANCY",accent);tft.fillRoundRect(3,16,154,86,5,SPECTRUM_CARD_BG);tft.drawRoundRect(3,16,154,86,5,SPECTRUM_BORDER);}
@@ -31,7 +34,49 @@ void DisplayManager::renderRfEnvironmentScreen() {
     } else if(appState.appMode==APP_MODE_ENV_BEFORE_AFTER){
         if(layout){drawModernHeader("BEFORE / AFTER",accent);tft.fillRoundRect(3,16,154,86,5,SPECTRUM_CARD_BG);tft.drawRoundRect(3,16,154,86,5,SPECTRUM_BORDER);}const auto&a=rfEnvironmentState.before;const auto&b=rfEnvironmentState.after;const bool snapshotsChanged=layout||previousBeforeCapturedMs!=a.capturedMs||previousAfterCapturedMs!=b.capturedMs;if(snapshotsChanged){tft.fillRect(8,20,144,77,SPECTRUM_CARD_BG);if(!a.valid||!b.valid){tft.fillRoundRect(20,37,120,34,5,SPECTRUM_HEADER_BG);tft.setCursor(a.valid?38:32,45);tft.setTextColor(SPECTRUM_ACCENT,SPECTRUM_HEADER_BG);tft.print(a.valid?"CAPTURE AFTER":"CAPTURE BEFORE");tft.setCursor(42,59);tft.setTextColor(ST77XX_GRAY,SPECTRUM_HEADER_BG);tft.print("PRESS RIGHT");}else{tft.setCursor(10,22);tft.setTextColor(ST77XX_GRAY,SPECTRUM_CARD_BG);tft.print("METRIC");tft.setCursor(74,22);tft.print("BEFORE > AFTER");const char* names[3]={"AVG","PEAK","SCORE"};uint16_t av[3]={a.average,a.peak,a.score},bv[3]={b.average,b.peak,b.score};for(int i=0;i<3;i++){int y=36+i*14;tft.setCursor(10,y);tft.setTextColor(ST77XX_WHITE,SPECTRUM_CARD_BG);tft.print(names[i]);tft.setCursor(70,y);tft.printf("%3u  >  %3u",av[i],bv[i]);}}previousBeforeCapturedMs=a.capturedMs;previousAfterCapturedMs=b.capturedMs;previousSnapshotChannel=0xFF;}if(a.valid&&b.valid&&(snapshotsChanged||previousSnapshotChannel!=envBandChannel)){int cd=(int)b.channelOccupancy[envBandChannel]-a.channelOccupancy[envBandChannel];uint16_t dc=cd>0?SPECTRUM_HIGH:cd<0?SPECTRUM_LOW:ST77XX_GRAY;tft.fillRoundRect(9,80,142,16,4,SPECTRUM_HEADER_BG);tft.setCursor(14,84);tft.setTextColor(dc,SPECTRUM_HEADER_BG);tft.printf("CH%u %u>%u DELTA %+d%%",envBandChannel,a.channelOccupancy[envBandChannel],b.channelOccupancy[envBandChannel],cd);previousSnapshotChannel=envBandChannel;}
     } else if(appState.appMode==APP_MODE_ENV_BAND_INFO){
-        if(layout){drawModernHeader("BAND OVERLAP INFO",accent);tft.fillRoundRect(3,16,154,86,5,SPECTRUM_CARD_BG);tft.drawRoundRect(3,16,154,86,5,SPECTRUM_BORDER);}tft.fillRect(8,20,144,77,SPECTRUM_CARD_BG);uint16_t f=RfEnvironmentMath::frequencyMHz(envBandChannel);tft.fillRoundRect(10,20,138,22,5,SPECTRUM_HEADER_BG);tft.setCursor(16,24);tft.setTextColor(SPECTRUM_ACCENT,SPECTRUM_HEADER_BG);tft.printf("CH %u",envBandChannel);tft.setCursor(91,24);tft.setTextColor(ST77XX_WHITE,SPECTRUM_HEADER_BG);tft.printf("%u MHz",f);tft.setCursor(10,47);tft.setTextColor(ST77XX_GRAY,SPECTRUM_CARD_BG);tft.print("POSSIBLE BAND REGIONS");int8_t wifi=RfEnvironmentMath::wifiChannelForMHz(f);const char* tags[3];char wifiTag[20];if(wifi>0)snprintf(wifiTag,sizeof(wifiTag),"WIFI CH%d OVERLAP",wifi);else snprintf(wifiTag,sizeof(wifiTag),"WIFI OUTSIDE");tags[0]=wifiTag;tags[1]=(f>=2402&&f<=2480)?"BLE / BT REGION":"BLE / BT OUTSIDE";int8_t z=RfEnvironmentMath::zigbeeChannelForMHz(f);char zigTag[22];if(z>0)snprintf(zigTag,sizeof(zigTag),"ZIGBEE CH%d CENTER",z);else snprintf(zigTag,sizeof(zigTag),f>=2405&&f<=2480?"ZIGBEE OVERLAP":"ZIGBEE OUTSIDE");tags[2]=zigTag;for(int i=0;i<3;i++){int y=60+i*13;uint16_t tc=strstr(tags[i],"OUTSIDE")?ST77XX_GRAY:(i==0?SPECTRUM_HIGH:i==1?SPECTRUM_ACCENT:SPECTRUM_LOW);tft.fillRoundRect(10,y,138,10,3,SPECTRUM_HEADER_BG);tft.setCursor(15,y+2);tft.setTextColor(tc,SPECTRUM_HEADER_BG);tft.print(tags[i]);}
+        if(layout){
+            drawModernHeader("BAND OVERLAP INFO",accent);
+            tft.fillRoundRect(3,16,154,86,5,SPECTRUM_CARD_BG);
+            tft.drawRoundRect(3,16,154,86,5,SPECTRUM_BORDER);
+            tft.setCursor(10,47);
+            tft.setTextColor(ST77XX_GRAY,SPECTRUM_CARD_BG);
+            tft.print("POSSIBLE BAND REGIONS");
+        }
+        if(layout||previousEnvBandChannel!=envBandChannel){
+            const uint16_t f=RfEnvironmentMath::frequencyMHz(envBandChannel);
+            // Dirty redraw: only the value card and the three result chips can
+            // change while browsing channels. The outer card, title, label,
+            // and footer remain untouched.
+            tft.fillRoundRect(10,20,138,22,5,SPECTRUM_HEADER_BG);
+            tft.setCursor(16,24);
+            tft.setTextColor(SPECTRUM_ACCENT,SPECTRUM_HEADER_BG);
+            tft.printf("CH %u",envBandChannel);
+            tft.setCursor(91,24);
+            tft.setTextColor(ST77XX_WHITE,SPECTRUM_HEADER_BG);
+            tft.printf("%u MHz",f);
+
+            int8_t wifi=RfEnvironmentMath::wifiChannelForMHz(f);
+            const char* tags[3];
+            char wifiTag[20];
+            if(wifi>0)snprintf(wifiTag,sizeof(wifiTag),"WIFI CH%d OVERLAP",wifi);
+            else snprintf(wifiTag,sizeof(wifiTag),"WIFI OUTSIDE");
+            tags[0]=wifiTag;
+            tags[1]=(f>=2402&&f<=2480)?"BLE / BT REGION":"BLE / BT OUTSIDE";
+            int8_t z=RfEnvironmentMath::zigbeeChannelForMHz(f);
+            char zigTag[22];
+            if(z>0)snprintf(zigTag,sizeof(zigTag),"ZIGBEE CH%d CENTER",z);
+            else snprintf(zigTag,sizeof(zigTag),f>=2405&&f<=2480?"ZIGBEE OVERLAP":"ZIGBEE OUTSIDE");
+            tags[2]=zigTag;
+            for(int i=0;i<3;i++){
+                const int y=60+i*13;
+                const uint16_t tc=strstr(tags[i],"OUTSIDE")?ST77XX_GRAY:(i==0?SPECTRUM_HIGH:i==1?SPECTRUM_ACCENT:SPECTRUM_LOW);
+                tft.fillRoundRect(10,y,138,10,3,SPECTRUM_HEADER_BG);
+                tft.setCursor(15,y+2);
+                tft.setTextColor(tc,SPECTRUM_HEADER_BG);
+                tft.print(tags[i]);
+            }
+            previousEnvBandChannel=envBandChannel;
+        }
     } else {if(layout){drawModernHeader("AUTHORIZED RF PROBE",SPECTRUM_HIGH);tft.fillRoundRect(3,16,154,87,5,SPECTRUM_CARD_BG);tft.drawRoundRect(3,16,154,87,5,SPECTRUM_HIGH);tft.fillRoundRect(46,18,68,11,3,DISPLAY_ACTIVE_BG);tft.setCursor(50,20);tft.setTextColor(SPECTRUM_HIGH,DISPLAY_ACTIVE_BG);tft.print("LAB USE ONLY");}
 #if RF_LAB_TX_ENABLED
         const auto&c=rfEnvironmentState.config;const char* labels[5]={"CHANNEL","INTERVAL","PACKETS","DURATION",rfAuthorizedProbe.isRunning()?"STOP PROBE":"START PROBE"};char values[4][12];snprintf(values[0],12,"CH %u",c.probeChannel);snprintf(values[1],12,"%u ms",c.probeIntervalMs);snprintf(values[2],12,"%u",c.probePacketCount);snprintf(values[3],12,"%u sec",c.probeMaxDurationSeconds);for(int i=0;i<5;i++){int y=31+i*13;bool sel=probeSelection==i;uint16_t rowBg=sel?SPECTRUM_HEADER_BG:SPECTRUM_CARD_BG;tft.fillRoundRect(8,y,144,11,3,rowBg);if(sel)tft.fillRect(8,y,3,11,SPECTRUM_ACCENT);tft.setCursor(14,y+2);tft.setTextColor(sel?ST77XX_WHITE:ST77XX_GRAY,rowBg);tft.print(labels[i]);if(i<4){tft.setCursor(104,y+2);tft.setTextColor(sel?SPECTRUM_ACCENT:ST77XX_WHITE,rowBg);tft.print(values[i]);}else{tft.setCursor(140,y+2);tft.setTextColor(rfAuthorizedProbe.isRunning()?SPECTRUM_CRITICAL:SPECTRUM_LOW,rowBg);tft.print(">");}}tft.fillRect(8,97,144,4,SPECTRUM_BORDER);int progress=c.probePacketCount?min<int>(144,(rfAuthorizedProbe.packetsSent()*144UL)/c.probePacketCount):0;if(progress)tft.fillRect(8,97,progress,4,rfAuthorizedProbe.isRunning()?SPECTRUM_HIGH:SPECTRUM_LOW);
@@ -42,4 +87,5 @@ void DisplayManager::renderRfEnvironmentScreen() {
     if(layout)drawModernFooter(appState.appMode==APP_MODE_ENV_PROBE?"U/D SEL":"U/D VIEW",appState.appMode==APP_MODE_ENV_PROBE?"R ACTION":(rfEnvironmentState.running?"R STOP":"R START"),"B BACK");
     else if(!envRunningStatusValid||previousEnvRunning!=rfEnvironmentState.running)drawFooterChip(56,49,rfEnvironmentState.running?"R STOP":"R START");
     previousEnvRunning=rfEnvironmentState.running;envRunningStatusValid=true;
+    envLayoutDrawn=true;
 }

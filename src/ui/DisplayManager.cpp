@@ -36,8 +36,10 @@ void DisplayManager::resetDynamicCaches() {
     memset(previousCompareLevels,0xFF,sizeof(previousCompareLevels));
     memset(previousCompareScores,0xFF,sizeof(previousCompareScores));
     previousEnvBursts=0xFFFF;previousEnvPeakChannel=0xFF;
+    previousEnvBandChannel=0xFF;
     previousSnapshotChannel=0xFF;previousBeforeCapturedMs=previousAfterCapturedMs=0xFFFFFFFF;
     envRunningStatusValid = false;
+    envLayoutDrawn = false;
     jammerLayoutDrawn = false;
     settingsLayoutDrawn = false;
     previousJammerTarget = -1;

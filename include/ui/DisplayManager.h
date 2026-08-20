@@ -65,11 +65,13 @@ private:
     uint8_t previousCompareScores[4] = {0xFF,0xFF,0xFF,0xFF};
     uint16_t previousEnvBursts = 0xFFFF;
     uint8_t previousEnvPeakChannel = 0xFF;
+    uint8_t previousEnvBandChannel = 0xFF;
     uint8_t previousSnapshotChannel = 0xFF;
     uint32_t previousBeforeCapturedMs = 0xFFFFFFFF;
     uint32_t previousAfterCapturedMs = 0xFFFFFFFF;
     bool previousEnvRunning = false;
     bool envRunningStatusValid = false;
+    bool envLayoutDrawn = false;
 
     // Tracks page transitions separately from content changes. A full clear is
     // only needed when a different page replaces the current layout.
