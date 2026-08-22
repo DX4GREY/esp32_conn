@@ -1,5 +1,43 @@
 # Lua Scripting Guide
 
+## Editor setup and generated API library
+
+The repository includes a generator for a LuaLS/EmmyLua-compatible definition
+of the global `rf` API. Generate it from the repository root:
+
+```bash
+python3 tools/generate_lua_library.py
+```
+
+The default output is `tools/generated/rfsuite.lua`. Add that directory as a
+Lua language-server library (for example, in VS Code workspace settings):
+
+```json
+{
+  "Lua.workspace.library": [
+    "${workspaceFolder}/tools/generated"
+  ],
+  "Lua.runtime.version": "Lua 5.1",
+  "Lua.diagnostics.globals": ["rf"]
+}
+```
+
+The generated file provides completion, parameter hints, string-value choices,
+return types, and the fields of `rf.status()`. It is an editor-only stub: do not
+copy or execute it on the device. Scripts themselves still go in
+`/RFSuite/scripts/` on the SD card.
+
+The generator reads the registered function names from
+`src/services/LuaEngine.cpp` and rejects missing or obsolete metadata. After
+changing the firmware API, update the signatures/descriptions in
+`tools/generate_lua_library.py`, regenerate the file, and verify it with:
+
+```bash
+python3 tools/generate_lua_library.py --check
+```
+
+Use `--output PATH` when another editor or project needs the stub elsewhere.
+
 ## Preparing the SD card
 
 Format the card as FAT16 or FAT32. At boot the firmware creates these folders:
@@ -42,6 +80,12 @@ filesystem, operating-system, dynamic package loading, `dofile`, `loadfile`,
 Scripts have a 200,000-instruction limit so an accidental endless loop returns
 an error instead of permanently blocking the UI.
 
+This is a synchronous, one-shot runtime: a fresh VM is created for every run,
+top-level statements execute once, and all Lua variables disappear afterward.
+Long loops delay normal UI and analyzer processing even when they remain under
+the instruction limit. Prefer short tasks; for interactive GUI scripts, keep
+delays small and leave the loop when the user requests an exit.
+
 ## RFSuite `rf` library
 
 ### Reading analyzer data
@@ -56,6 +100,10 @@ an error instead of permanently blocking the UI.
 
 `rf.status()` contains `peak_channel`, `peak_level`, `confidence`, `cursor`,
 `sweeps`, `radios`, `frozen`, `logging`, and `environment_running`.
+
+`rf.spectrum()` is deliberately 1-based like a normal Lua array. Convert an
+array index to an RF24 channel with `channel = index - 1`. Activity values and
+status fields are snapshots; call the function again to obtain newer data.
 
 ### Analyzer control
 
@@ -105,6 +153,11 @@ frame.
 Colors are `white`, `black`, `gray`, `accent`/`cyan`, `green`, `yellow`,
 `orange`, and `red`. Color arguments are optional and default to white. On a
 Lua GUI, press `A` to rerun the script and `B` to return to the script list.
+
+Optional parameters are positional. To fill a rectangle with the default white
+color, pass the default color explicitly: `rf.gui_rect(0, 0, 20, 10, "white",
+true)`. Canvas drawing is not automatically refreshed by a callback; the script
+must draw each new frame itself.
 
 ### Controlled-lab RF functions
 
@@ -207,3 +260,19 @@ end
 
 Keep scripts short and event-oriented. A script runs synchronously, so regular
 button processing and scanning resume after it exits.
+
+## Script design checklist
+
+- Keep the file below 32 KiB and use a safe filename containing letters,
+  numbers, `_`, `-`, or `.`.
+- Validate channels before calling channel functions; valid RF24 channels are
+  `0..125`.
+- Remember that displayed activity is a relative carrier-hit percentage, not
+  calibrated RSSI or dBm.
+- Check boolean results from `rf.recording()`, `rf.environment()`, and
+  `rf.lab_start()` instead of assuming the operation started.
+- Wrap expected argument failures with `pcall`; an unhandled Lua error stops the
+  whole script and is reported on Serial/TFT.
+- Use `rf.delay()` rather than a busy-wait loop. Each call is limited to 1000 ms.
+- Stop controlled-lab activity with `rf.lab_stop()` before leaving a lab script,
+  including its error path. Active RF remains unavailable in normal builds.
