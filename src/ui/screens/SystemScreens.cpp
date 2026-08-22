@@ -33,17 +33,17 @@ void DisplayManager::renderSettingsScreen() {
         const bool selected = settingsSelection == item;
         const uint16_t background = selected ?
                                     SPECTRUM_HEADER_BG : SPECTRUM_CARD_BG;
-        tft.fillRect(5, y, 150, 19, ST77XX_BLACK);
-        tft.fillRoundRect(5, y, 150, 19, 4, background);
-        tft.drawRoundRect(5, y, 150, 19, 4,
+        tft.fillRect(5, y, 150, 16, ST77XX_BLACK);
+        tft.fillRoundRect(5, y, 150, 16, 4, background);
+        tft.drawRoundRect(5, y, 150, 16, 4,
                           selected ? SPECTRUM_ACCENT : SPECTRUM_BORDER);
-        if (selected) tft.fillRoundRect(8, y + 3, 3, 13, 1, SPECTRUM_ACCENT);
-        tft.setCursor(15, y + 6);
+        if (selected) tft.fillRoundRect(8, y + 3, 3, 10, 1, SPECTRUM_ACCENT);
+        tft.setCursor(15, y + 4);
         tft.setTextColor(selected ? SPECTRUM_ACCENT : ST77XX_GRAY,
                          background);
         tft.print(label);
         const int valueX = 148 - static_cast<int>(strlen(value)) * 6;
-        tft.setCursor(valueX, y + 6);
+        tft.setCursor(valueX, y + 4);
         tft.setTextColor(valueColor, background);
         tft.print(value);
     };
@@ -54,9 +54,14 @@ void DisplayManager::renderSettingsScreen() {
     else if (appState.powerLevel == RF24_PA_LOW) pwrColor = SPECTRUM_MID;
     else pwrColor = SPECTRUM_LOW;
     drawSettingRow(0, 17, "TX POWER", appState.getPowerLevelName(), pwrColor);
-    drawSettingRow(1, 38, "SAMPLE DWELL", appState.getDwellTimeName(), SPECTRUM_ACCENT);
-    drawSettingRow(2, 59, "DISPLAY THEME", appState.getDisplayThemeName(), SPECTRUM_ACCENT);
-    drawSettingRow(3, 80, "MENU VIEW", appState.getMenuLayoutName(), SPECTRUM_LOW);
+    drawSettingRow(1, 34, "SAMPLE DWELL", appState.getDwellTimeName(), SPECTRUM_ACCENT);
+    drawSettingRow(2, 51, "DISPLAY THEME", appState.getDisplayThemeName(), SPECTRUM_ACCENT);
+    drawSettingRow(3, 68, "MENU VIEW", appState.getMenuLayoutName(), SPECTRUM_LOW);
+    const char* sniffSave = !storageManager.usingSd() ? "NO SD" :
+                            (appState.saveSniffPacketsToSd ? "SD CARD" : "OFF");
+    const uint16_t sniffColor = !storageManager.usingSd() ? SPECTRUM_CRITICAL :
+                                  (appState.saveSniffPacketsToSd ? SPECTRUM_LOW : ST77XX_GRAY);
+    drawSettingRow(4, 85, "SAVE SNIFF", sniffSave, sniffColor);
 
     previousSettingsSelection = settingsSelection;
     previousPowerLevel = static_cast<int>(appState.powerLevel);

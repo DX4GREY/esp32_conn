@@ -35,6 +35,7 @@ constexpr MenuFeature FEATURES[MenuCatalog::FEATURE_COUNT] = {
 #endif
     ,{"LUA SCRIPTS",APP_MODE_LUA_SCRIPTS,      9, MENU_OPEN_STOP_RADIOS}
     ,{"SD FILES", APP_MODE_FILE_EXPLORER,      12, MENU_OPEN_STOP_RADIOS}
+    ,{"PKT SNIFF", APP_MODE_PACKET_SNIFFER,    7, MENU_OPEN_NONE}
 };
 
 constexpr const char* PAGE_TITLES[MenuCatalog::PAGE_COUNT] = {
@@ -45,7 +46,7 @@ constexpr const char* PAGE_TITLES[MenuCatalog::PAGE_COUNT] = {
     "SCRIPTING"
 };
 
-constexpr uint8_t PAGE_ITEM_COUNTS[MenuCatalog::PAGE_COUNT] = {6, 6, 6, 2, 2};
+constexpr uint8_t PAGE_ITEM_COUNTS[MenuCatalog::PAGE_COUNT] = {6, 6, 6, 2, 3};
 
 }  // namespace
 

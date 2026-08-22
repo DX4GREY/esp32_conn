@@ -5,6 +5,7 @@
 #include <freertos/FreeRTOS.h>
 #include "config/Config.h"
 #include "core/AppState.h"
+#include "services/PacketSniffer.h"
 
 class RadioManager {
 public:
@@ -23,6 +24,13 @@ public:
     uint8_t inspectChannel(int channel);
     bool sampleCarrier(uint8_t channel, uint16_t requested, uint16_t& hits, uint16_t& samples);
     bool transmitProbePacket(uint8_t channel, uint8_t pa, uint8_t rate, uint8_t size, const uint8_t* payload);
+
+    // Passive raw-payload capture on radio 1. Radio 2 is never reconfigured.
+    bool startPacketSniffer(uint8_t channel, SnifferDataRate rate);
+    void stopPacketSniffer();
+    bool servicePacketSniffer();
+    bool setPacketSnifferChannel(uint8_t channel);
+    bool setPacketSnifferDataRate(SnifferDataRate rate);
 
     // Utility
     void stopAll();

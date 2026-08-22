@@ -27,6 +27,7 @@ struct AppState {
     volatile int dwellTimeUs = JAMMER_DWELL_US;
     DisplayThemeId displayTheme = DISPLAY_THEME_CYBER;
     MenuLayout menuLayout = MENU_LAYOUT_GRID;
+    bool saveSniffPacketsToSd = false;
 
     // ----- ANALYZER STATE -----
     AnalyzerBand analyzerBand = SCAN_BAND_ALL;

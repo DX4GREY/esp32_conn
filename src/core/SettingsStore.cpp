@@ -4,7 +4,7 @@
 #include "core/RfEnvironmentMath.h"
 
 namespace {
-constexpr uint8_t SETTINGS_SCHEMA_VERSION = 4;
+constexpr uint8_t SETTINGS_SCHEMA_VERSION = 5;
 constexpr unsigned long SETTINGS_SAVE_DELAY_MS = 1500;
 }
 
@@ -82,6 +82,9 @@ void AppState::loadSettings() {
         const uint8_t layout = prefs.getUChar("menu_view", MENU_LAYOUT_GRID);
         menuLayout = layout < MENU_LAYOUT_COUNT ? static_cast<MenuLayout>(layout) : MENU_LAYOUT_GRID;
     }
+    if (storedSchema >= 5) {
+        saveSniffPacketsToSd = prefs.getBool("sniff_sd", false);
+    }
     prefs.end();
 
     setJammerTarget(jammerTarget);
@@ -100,6 +103,7 @@ void AppState::saveSettings() {
     prefs.putInt("custom", customSpectrumSamples);
     prefs.putUChar("theme", static_cast<uint8_t>(displayTheme));
     prefs.putUChar("menu_view", static_cast<uint8_t>(menuLayout));
+    prefs.putBool("sniff_sd", saveSniffPacketsToSd);
     prefs.putUChar("trace", static_cast<uint8_t>(analyzerTraceMode));
     prefs.putUChar("evt_thr", eventThreshold);
     prefs.putUChar("evt_hys", eventHysteresis);
@@ -147,6 +151,7 @@ void AppState::factoryResetSettings() {
     dwellTimeUs = JAMMER_DWELL_US;
     displayTheme = DISPLAY_THEME_CYBER;
     menuLayout = MENU_LAYOUT_GRID;
+    saveSniffPacketsToSd = false;
     scanProfile = SCAN_PROFILE_BALANCED;
     customSpectrumSamples = 40;
     analyzerTraceMode = ANALYZER_TRACE_LIVE;

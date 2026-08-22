@@ -94,6 +94,7 @@ private:
     unsigned long lastJammerRenderMs = 0;
     unsigned long lastStatusRenderMs = 0;
     unsigned long lastEnvRenderMs = 0;
+    unsigned long lastSnifferRenderMs = 0;
     uint8_t previousEnvHistoryHead = 0xFF;
     uint8_t previousEnvEventHead = 0xFF;
     uint8_t previousEnvEventScroll = 0xFF;
@@ -148,6 +149,7 @@ private:
     void renderRfEnvironmentScreen();
     void renderLuaScriptsScreen();
     void renderFileExplorerScreen();
+    void renderPacketSnifferScreen();
     void renderVideoPlayer();
     void renderPhotoViewer();
     void renderRebootScreen();

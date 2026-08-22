@@ -8,6 +8,7 @@
 #include "services/RfAuthorizedProbe.h"
 #include "services/LuaEngine.h"
 #include "services/StorageManager.h"
+#include "services/PacketSniffer.h"
 
 namespace {
 class LuaDisplayStream : public Stream {
@@ -144,6 +145,13 @@ void DisplayManager::updateUI() {
         case APP_MODE_FILE_EXPLORER:
             if (needRedraw) { renderFileExplorerScreen(); needRedraw = false; }
             break;
+        case APP_MODE_PACKET_SNIFFER:
+            if (needRedraw || millis() - lastSnifferRenderMs >= 200) {
+                renderPacketSnifferScreen();
+                lastSnifferRenderMs = millis();
+                needRedraw = false;
+            }
+            break;
         case APP_MODE_VIDEO_PLAYER:
             renderVideoPlayer();
             needRedraw = false;
@@ -237,6 +245,10 @@ void DisplayManager::processInput() {
             if (feature.mode == APP_MODE_FILE_EXPLORER) {
                 filePath = "/"; fileEntryCount = 0; fileSelection = 0;
                 fileStatus = "";
+            }
+            if (feature.mode == APP_MODE_PACKET_SNIFFER) {
+                radioManager.startPacketSniffer(40, SnifferDataRate::RATE_2_MBPS);
+                lastSnifferRenderMs = 0;
             }
             appState.appMode = feature.mode;
             needRedraw = true;
@@ -434,10 +446,10 @@ void DisplayManager::processInput() {
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_SETTINGS) {
         if (buttonManager.isPressed(BTN_UP)) {
-            settingsSelection = (settingsSelection + 3) % 4;
+            settingsSelection = (settingsSelection + 4) % 5;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
-            settingsSelection = (settingsSelection + 1) % 4;
+            settingsSelection = (settingsSelection + 1) % 5;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_A)) {
             if (settingsSelection == 0) {
@@ -450,9 +462,12 @@ void DisplayManager::processInput() {
                 // Force one clean page rebuild so no pixels from the previous
                 // palette remain. Normal updates stay partial afterwards.
                 renderedMode = -1;
-            } else {
+            } else if (settingsSelection == 3) {
                 appState.cycleMenuLayout(1);
                 menuScrollOffset = prevMenuScrollOffset = 0;
+            } else if (storageManager.usingSd()) {
+                appState.saveSniffPacketsToSd = !appState.saveSniffPacketsToSd;
+                appState.markSettingsDirty();
             }
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
@@ -601,6 +616,26 @@ void DisplayManager::processInput() {
                 filePath = slash <= 0 ? "/" : filePath.substring(0, slash);
                 fileEntryCount = 0; fileSelection = 0; fileStatus = "";
             }
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_PACKET_SNIFFER) {
+        if (buttonManager.isPressed(BTN_UP)) {
+            const uint8_t next = packetSniffer.channel() >= 125 ? 0 : packetSniffer.channel() + 1;
+            radioManager.setPacketSnifferChannel(next);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            const uint8_t next = packetSniffer.channel() == 0 ? 125 : packetSniffer.channel() - 1;
+            radioManager.setPacketSnifferChannel(next);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_A)) {
+            const SnifferDataRate next = packetSniffer.dataRate() == SnifferDataRate::RATE_1_MBPS
+                ? SnifferDataRate::RATE_2_MBPS : SnifferDataRate::RATE_1_MBPS;
+            radioManager.setPacketSnifferDataRate(next);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            radioManager.stopPacketSniffer();
+            appState.appMode = APP_MODE_MENU;
             needRedraw = true;
         }
     }

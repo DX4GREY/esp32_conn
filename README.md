@@ -28,6 +28,8 @@ The interface is designed for a 160 × 128 landscape display. It uses partial/di
   and protocol-band hints.
 - RF event detector with configurable threshold, hysteresis, duration, and multi-channel criteria.
 - Buffered LittleFS session recorder (256 KiB cap), USB CSV summary, export, and last-sweep replay.
+- Experimental passive nRF24 raw-payload sniffer with selectable channel and
+  1/2 Mbps rate, live hexadecimal preview, and Serial dump.
 - `FAST`, `BALANCED`, `DEEP`, and `CUSTOM` analyzer profiles.
 - Independent connectivity diagnostics for both radios.
 - Four-page System Status with live ESP32, radio, build-profile, storage, UI, scan, and SPI timing data.
@@ -111,6 +113,18 @@ All buttons use `INPUT_PULLUP` and are active-low. Connect one side of each butt
 | A | 9 | Open, confirm, or perform an action |
 | DOWN | 8 | Next item or change analyzer mode |
 | B | 5 | Back or switch main-menu page |
+
+On **Scripting → PKT SNIFF**, `UP/DOWN` selects nRF24 channel 0–125, `A`
+switches between 1 and 2 Mbps, and `B` stops capture. The screen shows the most
+recent 32-byte raw payload as hexadecimal; complete payloads are also written
+to the Serial Monitor. This experimental mode uses radio 1 only and leaves
+radio 2's configuration untouched.
+
+Enable **Settings → SAVE SNIFF → SD CARD** to append captured packets to
+`/RFSuite/log/packet_sniffer.csv`. The option can only be enabled when an SD
+card was detected at boot. Records contain uptime milliseconds, RF channel,
+data rate, and the 32-byte hexadecimal payload; writes are buffered to avoid a
+filesystem operation for every received packet.
 
 ## Setup and build
 

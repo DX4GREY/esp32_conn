@@ -142,6 +142,9 @@ void loop() {
         //  eliminating flicker from repeated fillScreen)
         radioManager.inspectChannel(appState.inspectedChannel);
         delay(25);
+    } else if (appState.appMode == APP_MODE_PACKET_SNIFFER) {
+        radioManager.servicePacketSniffer();
+        delay(2);
     } else if (appState.appMode == APP_MODE_REBOOT ||
                appState.appMode == APP_MODE_SHUTDOWN) {
         // Reboot Mode: screen is rendered in updateUI, restart is briefly delayed

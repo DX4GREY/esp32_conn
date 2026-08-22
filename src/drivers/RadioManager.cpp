@@ -352,6 +352,7 @@ void RadioManager::stopJammer() {
 }
 
 void RadioManager::stopAll() {
+    stopPacketSniffer();
     stopJammer();
     scanAbortRequested = true;
     // scanSpectrum owns this same non-recursive mutex. When stopAll() is
@@ -368,6 +369,73 @@ void RadioManager::stopAll() {
 }
 
 void RadioManager::requestScanAbort() { scanAbortRequested = true; }
+
+bool RadioManager::startPacketSniffer(uint8_t channel, SnifferDataRate rate) {
+    stopJammer();
+    scanAbortRequested = true;
+    if (!radio1Available) {
+        Serial.println("[sniffer] radio 1 is unavailable");
+        return false;
+    }
+    if (!lockBus()) {
+        Serial.println("[sniffer] SPI bus timeout during start");
+        return false;
+    }
+    const bool ok = packetSniffer.start(radio, SPI, CE_PIN, CSN_PIN, channel, rate);
+    if (!ok) {
+        packetSniffer.stop(radio);
+        radio.flush_rx();
+        radio.setAddressWidth(5);
+        radio.setAutoAck(false);
+        radio.setDataRate(RF24_2MBPS);
+        radio.setCRCLength(RF24_CRC_DISABLED);
+        radio.startListening();
+    }
+    unlockBus();
+    if (!ok) packetSniffer.closeStorage();
+    return ok;
+}
+
+void RadioManager::stopPacketSniffer() {
+    if (!packetSniffer.hasRadioControl()) return;
+    if (!lockBus()) {
+        Serial.println("[sniffer] SPI bus timeout during stop");
+        return;
+    }
+    packetSniffer.stop(radio);
+    // Restore only radio 1 to the normal passive analyzer configuration.
+    radio.flush_rx();
+    radio.setAddressWidth(5);
+    radio.setAutoAck(false);
+    radio.setDataRate(RF24_2MBPS);
+    radio.setCRCLength(RF24_CRC_DISABLED);
+    radio.startListening();
+    unlockBus();
+    packetSniffer.closeStorage();
+}
+
+bool RadioManager::servicePacketSniffer() {
+    if (!packetSniffer.isRunning()) return false;
+    if (!lockBus(pdMS_TO_TICKS(20))) return false;
+    const bool captured = packetSniffer.poll(radio);
+    unlockBus();
+    packetSniffer.serviceStorage();
+    return captured;
+}
+
+bool RadioManager::setPacketSnifferChannel(uint8_t channel) {
+    if (!packetSniffer.isRunning() || !lockBus()) return false;
+    const bool ok = packetSniffer.setChannel(radio, channel);
+    unlockBus();
+    return ok;
+}
+
+bool RadioManager::setPacketSnifferDataRate(SnifferDataRate rate) {
+    if (!packetSniffer.isRunning() || !lockBus()) return false;
+    const bool ok = packetSniffer.setDataRate(radio, rate);
+    unlockBus();
+    return ok;
+}
 
 void RadioManager::updatePALevel(rf24_pa_dbm_e pwr) {
     appState.powerLevel = pwr;

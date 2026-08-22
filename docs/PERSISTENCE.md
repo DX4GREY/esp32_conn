@@ -8,13 +8,13 @@ Configuration uses ESP32 Preferences namespace:
 appstate
 ```
 
-The current schema version is `4`.
+The current schema version is `5`.
 
 ## Stored keys
 
 | Key | Type | Default | Validation / meaning |
 |---|---|---|---|
-| `schema` | unsigned byte | `4` when first saved | Persistence schema version |
+| `schema` | unsigned byte | `5` when first saved | Persistence schema version |
 | `power` | integer | `RF24_PA_MAX` | Must be within RF24 PA enum range |
 | `dwell` | integer | `200` | Clamped to `10–10000` µs |
 | `target` | unsigned byte | Wi-Fi | Must be one of six target enums |
@@ -22,6 +22,7 @@ The current schema version is `4`.
 | `custom` | integer | `40` | Clamped to `10–100` samples |
 | `theme` | unsigned byte | CYBER | Must be one of six themes |
 | `menu_view` | unsigned byte | GRID | GRID or LIST menu layout |
+| `sniff_sd` | boolean | `false` | Save packet-sniffer records to SD when mounted |
 | `trace` | unsigned byte | LIVE | LIVE, AVG, MAX, or DELTA; DELTA restores as LIVE |
 | `evt_thr` | unsigned byte | `60` | Clamped to `5–100` |
 | `evt_hys` | unsigned byte | `10` | Clamped to `0–threshold` |
@@ -50,8 +51,9 @@ Explicit `saveSettings()` is used by factory reset. Shutdown currently does not 
 
 Schema 0/legacy installations load the original keys. Schema 2 adds analyzer
 trace, event, and watch settings; schema 3 adds RF-environment and lab-probe
-settings; schema 4 adds the menu layout. Missing newer fields use defaults and
-schedule one deferred schema-4 save. Every loaded enum and numeric value is
+settings; schema 4 adds the menu layout; schema 5 adds packet-sniffer SD
+logging. Missing newer fields use defaults and schedule one deferred schema-5
+save. Every loaded enum and numeric value is
 validated before use.
 
 Future migrations should:
@@ -79,7 +81,7 @@ It performs these actions:
 1. Stops radio activity and the recorder.
 2. Clears the `appstate` NVS namespace.
 3. Restores default power, dwell, theme, profile, custom depth, trace, event settings, watchlist, and target.
-4. Saves schema-4 defaults, including the RF-environment configuration and GRID layout.
+4. Saves schema-5 defaults, including RF-environment configuration, GRID layout, and disabled sniffer logging.
 5. Reboots.
 
 Factory reset does not erase the LittleFS session file. Starting a new session replaces that file.
