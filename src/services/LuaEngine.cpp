@@ -19,6 +19,60 @@ extern "C" {
 
 LuaEngine luaEngine;
 
+/* LUA_LIBRARY_METADATA
+{
+ "annotations":[
+  "---@alias RfChannel integer # RF24 channel 0..125.",
+  "---@alias RfBand \"all\"|\"wifi\"|\"bt\"",
+  "---@alias RfTrace \"live\"|\"avg\"|\"max\"|\"delta\"",
+  "---@alias RfScreen \"spectrum\"|\"waterfall\"|\"inspect\"|\"survey\"|\"events\"|\"logging\"|\"status\"|\"menu\"",
+  "---@alias RfButton \"up\"|\"down\"|\"a\"|\"b\"|\"right\"|\"left\"",
+  "---@alias RfColor \"white\"|\"black\"|\"gray\"|\"accent\"|\"cyan\"|\"green\"|\"yellow\"|\"orange\"|\"red\"",
+  "",
+  "---@class RfStatus",
+  "---@field peak_channel RfChannel",
+  "---@field peak_level integer",
+  "---@field confidence integer",
+  "---@field cursor RfChannel",
+  "---@field sweeps integer",
+  "---@field radios integer",
+  "---@field frozen boolean",
+  "---@field logging boolean",
+  "---@field environment_running boolean"
+ ],
+ "functions":[
+  {"name":"millis","description":"Return the device uptime.","returns":[{"type":"integer","description":"Milliseconds since boot."}]},
+  {"name":"peak_channel","description":"Return the strongest channel in the latest scan.","returns":[{"type":"RfChannel","description":"Current peak channel."}]},
+  {"name":"level","description":"Read the latest activity for one channel.","params":[{"name":"channel","type":"RfChannel"}],"returns":[{"type":"integer","description":"Relative activity from 0 to 100."}]},
+  {"name":"log","description":"Append a timestamped message to the Lua log on the SD card.","params":[{"name":"message","type":"string"}]},
+  {"name":"spectrum","description":"Return a snapshot of all channel activity values.","returns":[{"type":"integer[]","description":"126 values; index 1 represents RF channel 0."}]},
+  {"name":"status","description":"Return current analyzer and recorder status.","returns":[{"type":"RfStatus"}]},
+  {"name":"set_cursor","description":"Move the analyzer cursor.","params":[{"name":"channel","type":"RfChannel"}]},
+  {"name":"freeze","description":"Freeze or resume analyzer acquisition.","params":[{"name":"frozen","type":"boolean"}]},
+  {"name":"set_band","description":"Select the analyzer scan band.","params":[{"name":"band","type":"RfBand"}]},
+  {"name":"set_trace","description":"Select the analyzer trace mode.","params":[{"name":"trace","type":"RfTrace"}]},
+  {"name":"capture_baseline","description":"Capture the current levels as the DELTA baseline."},
+  {"name":"clear_max","description":"Clear the maximum trace history."},
+  {"name":"toggle_watch","description":"Toggle a watched-channel marker.","params":[{"name":"channel","type":"RfChannel"}]},
+  {"name":"recording","description":"Start a new recording session or stop recording.","params":[{"name":"start","type":"boolean"}],"returns":[{"type":"boolean","description":"True when the requested operation succeeded."}]},
+  {"name":"environment","description":"Start or stop passive occupancy analysis.","params":[{"name":"start","type":"boolean"}],"returns":[{"type":"boolean","description":"True when the requested operation succeeded."}]},
+  {"name":"open_screen","description":"Choose the TFT screen shown after the script exits.","params":[{"name":"screen","type":"RfScreen"}]},
+  {"name":"gui_begin","description":"Open and clear the protected 152 x 86 Lua canvas.","params":[{"name":"title","type":"string","default":"\"LUA GUI\""}]},
+  {"name":"gui_footer","description":"Set the three firmware footer labels.","params":[{"name":"left","type":"string","default":"\"\""},{"name":"middle","type":"string","default":"\"\""},{"name":"right","type":"string","default":"\"\""}]},
+  {"name":"gui_clear","description":"Clear the Lua canvas without overwriting its firmware frame."},
+  {"name":"gui_text","description":"Draw clipped single-line text.","params":[{"name":"x","type":"integer"},{"name":"y","type":"integer"},{"name":"text","type":"string"},{"name":"color","type":"RfColor","default":"\"white\""}]},
+  {"name":"gui_pixel","description":"Draw one clipped pixel.","params":[{"name":"x","type":"integer"},{"name":"y","type":"integer"},{"name":"color","type":"RfColor","default":"\"white\""}]},
+  {"name":"gui_line","description":"Draw a clipped line.","params":[{"name":"x0","type":"integer"},{"name":"y0","type":"integer"},{"name":"x1","type":"integer"},{"name":"y1","type":"integer"},{"name":"color","type":"RfColor","default":"\"white\""}]},
+  {"name":"gui_rect","description":"Draw an outline or filled rectangle.","params":[{"name":"x","type":"integer"},{"name":"y","type":"integer"},{"name":"width","type":"integer"},{"name":"height","type":"integer"},{"name":"color","type":"RfColor","default":"\"white\""},{"name":"filled","type":"boolean","default":"false"}]},
+  {"name":"gui_circle","description":"Draw an outline or filled circle.","params":[{"name":"x","type":"integer"},{"name":"y","type":"integer"},{"name":"radius","type":"integer"},{"name":"color","type":"RfColor","default":"\"white\""},{"name":"filled","type":"boolean","default":"false"}]},
+  {"name":"button","description":"Read a hardware button during a script.","params":[{"name":"button","type":"RfButton"}],"returns":[{"type":"boolean","description":"True while the active-low button is pressed."}]},
+  {"name":"delay","description":"Wait 0 to 1000 ms while feeding the watchdog.","params":[{"name":"milliseconds","type":"integer"}]},
+  {"name":"lab_start","description":"Start an authorized-lab RF target; unavailable in analyzer builds.","params":[{"name":"target","type":"string"}],"returns":[{"type":"boolean","description":"True when transmission started."}]},
+  {"name":"lab_stop","description":"Stop all controlled-lab RF activity."}
+ ]
+}
+LUA_LIBRARY_METADATA_END */
+
 namespace {
 constexpr size_t MAX_SCRIPT_BYTES = 32U * 1024U;
 constexpr int MAX_VM_INSTRUCTIONS = 200000;

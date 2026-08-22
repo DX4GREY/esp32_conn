@@ -27,10 +27,12 @@ return types, and the fields of `rf.status()`. It is an editor-only stub: do not
 copy or execute it on the device. Scripts themselves still go in
 `/RFSuite/scripts/` on the SD card.
 
-The generator reads the registered function names from
-`src/services/LuaEngine.cpp` and rejects missing or obsolete metadata. After
-changing the firmware API, update the signatures/descriptions in
-`tools/generate_lua_library.py`, regenerate the file, and verify it with:
+The generator reads function names, signatures, defaults, return types, and
+descriptions directly from the `LUA_LIBRARY_METADATA` block in
+`src/services/LuaEngine.cpp`. It also compares those entries with the actual
+`lua_setfield()` registrations and rejects missing or obsolete metadata. After
+changing the firmware API, update its adjacent metadata in `LuaEngine.cpp`,
+regenerate the file, and verify it with:
 
 ```bash
 python3 tools/generate_lua_library.py --check
