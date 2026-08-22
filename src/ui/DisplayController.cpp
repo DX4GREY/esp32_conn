@@ -7,6 +7,7 @@
 #include "core/RfEnvironmentState.h"
 #include "services/RfAuthorizedProbe.h"
 #include "services/LuaEngine.h"
+#include "services/StorageManager.h"
 
 void DisplayManager::updateUI() {
     const int currentMode = static_cast<int>(appState.appMode);
@@ -119,6 +120,9 @@ void DisplayManager::updateUI() {
         case APP_MODE_LUA_SCRIPTS:
             if (needRedraw) { renderLuaScriptsScreen(); needRedraw = false; }
             break;
+        case APP_MODE_FILE_EXPLORER:
+            if (needRedraw) { renderFileExplorerScreen(); needRedraw = false; }
+            break;
         case APP_MODE_REBOOT:
             renderRebootScreen();   // di-render tiap frame agar animasi titik hidup
             break;
@@ -181,7 +185,7 @@ void DisplayManager::processInput() {
             prevMenuSelection = 0;
             needRedraw = true;
             menuNeedsPartialRedraw = false;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             const MenuFeature& feature =
                 MenuCatalog::featureAt(menuPage, menuSelection);
             if (feature.mode != APP_MODE_ANALYZER_SPECTRUM) {
@@ -198,6 +202,10 @@ void DisplayManager::processInput() {
             }
             if (feature.mode == APP_MODE_LUA_SCRIPTS) {
                 luaScriptCount = 0; luaScriptSelection = 0; luaRunStatus = "";
+            }
+            if (feature.mode == APP_MODE_FILE_EXPLORER) {
+                filePath = "/"; fileEntryCount = 0; fileSelection = 0;
+                fileStatus = "";
             }
             appState.appMode = feature.mode;
             needRedraw = true;
@@ -219,7 +227,7 @@ void DisplayManager::processInput() {
                 radioManager.startJammer(appState.jammerTarget);
             }
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             if (appState.jamming) {
                 radioManager.stopJammer();
             } else {
@@ -242,7 +250,7 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isLongPressed(BTN_DOWN)) {
             appState.cycleAnalyzerZoom();
             needRedraw = true;
-        } else if (buttonManager.isLongPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isLongPressed(BTN_A)) {
             appState.captureBaseline();
             needRedraw = true;
         } else if (buttonManager.isLongPressed(BTN_B)) {
@@ -256,7 +264,7 @@ void DisplayManager::processInput() {
             if (appState.analyzerFrozen) appState.setCursorChannel(appState.cursorChannel - 1, false);
             else { appState.cycleAnalyzerRadioMode(1); radioManager.requestScanAbort(); }
             needRedraw = true;
-        } else if (buttonManager.isShortReleased(BTN_RIGHT)) {
+        } else if (buttonManager.isShortReleased(BTN_A)) {
             appState.analyzerFrozen = !appState.analyzerFrozen;
             if (appState.analyzerFrozen) radioManager.requestScanAbort();
             if (!appState.analyzerFrozen) appState.cursorFollowsPeak = true;
@@ -275,7 +283,7 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isPressed(BTN_DOWN)) {
             appState.cycleAnalyzerRadioMode(1);
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             memset(appState.waterfall, 0, sizeof(appState.waterfall));
             appState.waterfallHead = 0;
             appState.waterfallCount = 0;
@@ -291,7 +299,7 @@ void DisplayManager::processInput() {
             appState.cycleAnalyzerBand(1);
             appState.resetSurvey();
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             appState.resetSurvey();
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
@@ -321,7 +329,7 @@ void DisplayManager::processInput() {
             appState.configureEventEngine(appState.eventThreshold, hysteresis,
                                           appState.eventMinSweeps, appState.eventMinChannels);
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             appState.clearEvents();
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
@@ -331,7 +339,7 @@ void DisplayManager::processInput() {
         }
     }
     else if (appState.appMode == APP_MODE_LOGGING) {
-        if (buttonManager.isPressed(BTN_RIGHT)) {
+        if (buttonManager.isPressed(BTN_A)) {
             if (appState.loggingEnabled) {
                 appState.loggingEnabled = false;
                 sessionRecorder.stop();
@@ -345,7 +353,7 @@ void DisplayManager::processInput() {
         }
     }
     else if (appState.appMode == APP_MODE_RADIO_DIAG) {
-        if (buttonManager.isPressed(BTN_RIGHT)) {
+        if (buttonManager.isPressed(BTN_A)) {
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
             appState.appMode = APP_MODE_MENU;
@@ -359,7 +367,7 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isPressed(BTN_DOWN)) {
             appState.cycleScanProfile(1);
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT) &&
+        } else if (buttonManager.isPressed(BTN_A) &&
                    appState.scanProfile == SCAN_PROFILE_CUSTOM) {
             appState.cycleCustomSampleCount();
             needRedraw = true;
@@ -380,7 +388,7 @@ void DisplayManager::processInput() {
             appState.inspectedChannel = constrain(appState.inspectedChannel - 1, MIN_CHANNEL, MAX_CHANNEL);
             appState.inspectedPeak = 0;
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             appState.inspectedChannel = (appState.inspectedChannel + 10) % (MAX_CHANNEL + 1);
             appState.inspectedPeak = 0;
             needRedraw = true;
@@ -400,7 +408,7 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isPressed(BTN_DOWN)) {
             settingsSelection = (settingsSelection + 1) % 4;
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             if (settingsSelection == 0) {
                 appState.cyclePowerLevel(1);
                 radioManager.updatePALevel(appState.powerLevel);
@@ -431,7 +439,7 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isPressed(BTN_DOWN)) {
             statusPage = (statusPage + 1) % 5;
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             lastStatusRenderMs = 0;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
@@ -445,7 +453,7 @@ void DisplayManager::processInput() {
     else if (appState.appMode >= APP_MODE_ENV_OCCUPANCY && appState.appMode <= APP_MODE_ENV_PROBE) {
         if (buttonManager.isPressed(BTN_B)) {
             rfEnvironmentAnalyzer.stop(); rfAuthorizedProbe.stop(); appState.appMode = APP_MODE_MENU; needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             if (appState.appMode == APP_MODE_ENV_BEFORE_AFTER) {
                 if (!rfEnvironmentState.before.valid) {rfEnvironmentState.captureSnapshot(rfEnvironmentState.before);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"before");}
                 else {rfEnvironmentState.captureSnapshot(rfEnvironmentState.after);sessionRecorder.recordEnvironmentSummary(rfEnvironmentState,"after");}
@@ -488,7 +496,7 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isPressed(BTN_DOWN) && luaScriptCount) {
             luaScriptSelection = (luaScriptSelection + 1) % luaScriptCount;
             luaRunStatus = ""; needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             if (!luaScriptCount) {
                 luaScriptCount = luaEngine.listScripts(luaScripts, LUA_UI_MAX_SCRIPTS);
                 luaScriptSelection = 0;
@@ -502,11 +510,38 @@ void DisplayManager::processInput() {
             luaRunStatus = ""; appState.appMode = APP_MODE_MENU; needRedraw = true;
         }
     }
+    else if (appState.appMode == APP_MODE_FILE_EXPLORER) {
+        if (buttonManager.isPressed(BTN_UP) && fileEntryCount) {
+            fileSelection = (fileSelection + fileEntryCount - 1) % fileEntryCount;
+            fileStatus = ""; needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN) && fileEntryCount) {
+            fileSelection = (fileSelection + 1) % fileEntryCount;
+            fileStatus = ""; needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_A) && fileEntryCount) {
+            if (fileDirectories[fileSelection]) {
+                if (filePath != "/") filePath += "/";
+                filePath += fileNames[fileSelection];
+                fileEntryCount = 0; fileSelection = 0; fileStatus = "";
+            } else {
+                fileStatus = String(fileSizes[fileSelection]) + " bytes";
+            }
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            if (filePath == "/") {
+                appState.appMode = APP_MODE_MENU;
+            } else {
+                const int slash = filePath.lastIndexOf('/');
+                filePath = slash <= 0 ? "/" : filePath.substring(0, slash);
+                fileEntryCount = 0; fileSelection = 0; fileStatus = "";
+            }
+            needRedraw = true;
+        }
+    }
     else if (appState.appMode == APP_MODE_POWER) {
         if (buttonManager.isPressed(BTN_UP) || buttonManager.isPressed(BTN_DOWN)) {
             powerSelection = (powerSelection + 1) % 2;
             needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+        } else if (buttonManager.isPressed(BTN_A)) {
             radioManager.stopAll();
             appState.appMode = powerSelection == 0 ? APP_MODE_REBOOT : APP_MODE_SHUTDOWN;
             needRedraw = true;

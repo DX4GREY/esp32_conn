@@ -80,7 +80,7 @@ CI proves compilation and pure-logic behavior, not hardware correctness.
 - Restart displays its transition screen and reboots.
 - Shutdown stops radios and sleeps.
 - Short wake press returns to sleep.
-- Holding `RIGHT` for about 1.5 seconds boots without immediately opening a menu item.
+- Holding `A` for about 1.5 seconds boots without immediately opening a menu item.
 
 ### Authorized lab profile
 

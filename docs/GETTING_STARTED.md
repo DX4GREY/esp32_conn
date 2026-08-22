@@ -55,7 +55,7 @@ The native suite does not require an ESP32. Hardware behavior still needs the ch
 
 On a normal boot the firmware performs these operations:
 
-1. Validates a deep-sleep wake gesture if the reset originated from the `RIGHT` button wake source.
+1. Validates a deep-sleep wake gesture if the reset originated from the `A` button wake source.
 2. Starts USB Serial at 115200 baud.
 3. Loads and validates versioned NVS settings.
 4. Mounts LittleFS for session recording. Mount failure triggers the framework's format-on-failure behavior.
@@ -71,10 +71,10 @@ The boot continues if no radio is detected. This intentional diagnostics-only mo
 2. Open `Tools → Status` and review all four pages.
 3. Open `Analyze → Spectrum`; verify that the graph updates without visible full-screen flicker.
 4. Change band, radio mode, trace, and zoom.
-5. Open `Analyze → Logging`, press `RIGHT`, and verify `RECORDING`.
+5. Open `Analyze → Logging`, press `A`, and verify `RECORDING`.
 6. Return to Status → Performance and verify the session row reports a sweep count.
 7. Stop recording and run `session info` over Serial.
-8. Test Shutdown, then hold `RIGHT` for approximately 1.5 seconds to wake.
+8. Test Shutdown, then hold `A` for approximately 1.5 seconds to wake.
 
 ## Build outputs
 

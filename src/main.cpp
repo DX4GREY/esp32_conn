@@ -32,10 +32,10 @@
 static constexpr unsigned long WAKE_HOLD_MS = 1500;
 
 static void configureShutdownWakeSource() {
-    pinMode(BTN_RIGHT, INPUT_PULLUP);
-    rtc_gpio_pulldown_dis(static_cast<gpio_num_t>(BTN_RIGHT));
-    rtc_gpio_pullup_en(static_cast<gpio_num_t>(BTN_RIGHT));
-    esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BTN_RIGHT), 0);
+    pinMode(BTN_A, INPUT_PULLUP);
+    rtc_gpio_pulldown_dis(static_cast<gpio_num_t>(BTN_A));
+    rtc_gpio_pullup_en(static_cast<gpio_num_t>(BTN_A));
+    esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BTN_A), 0);
 }
 
 [[noreturn]] static void enterShutdownSleep() {
@@ -48,21 +48,21 @@ static void configureShutdownWakeSource() {
 static void validateShutdownWakePress() {
     if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT0) return;
 
-    pinMode(BTN_RIGHT, INPUT_PULLUP);
+    pinMode(BTN_A, INPUT_PULLUP);
     const unsigned long started = millis();
-    while (digitalRead(BTN_RIGHT) == LOW && millis() - started < WAKE_HOLD_MS) {
+    while (digitalRead(BTN_A) == LOW && millis() - started < WAKE_HOLD_MS) {
         delay(10);
     }
 
     if (millis() - started < WAKE_HOLD_MS) {
         // A short/noisy press must not fully boot the device.
-        while (digitalRead(BTN_RIGHT) == LOW) delay(10);
+        while (digitalRead(BTN_A) == LOW) delay(10);
         delay(50);
         enterShutdownSleep();
     }
 
     // Avoid treating the wake gesture as an immediate menu ENTER press.
-    while (digitalRead(BTN_RIGHT) == LOW) delay(10);
+    while (digitalRead(BTN_A) == LOW) delay(10);
     delay(50);
 }
 
@@ -77,7 +77,7 @@ void yieldToUI() {
 // SETUP
 // =============================================================================
 void setup() {
-    // Deep-sleep wake is accepted only after a deliberate long RIGHT press.
+    // Deep-sleep wake is accepted only after a deliberate long A press.
     validateShutdownWakePress();
 
         // 1. Initialize Serial CLI (115200 Baud)
@@ -85,10 +85,6 @@ void setup() {
 
     // 1b. Load persisted settings (power level, dwell time, jammer target)
     appState.loadSettings();
-    if (!sessionRecorder.begin()) {
-        Serial.println("Session recorder unavailable: " + String(sessionRecorder.lastError()));
-    }
-    if (!luaEngine.begin()) Serial.println("Lua: " + String(luaEngine.lastError()));
 
     // 2. Initialize Navigation Buttons (Pull-Up)
     buttonManager.init();
@@ -98,6 +94,13 @@ void setup() {
 
     // 3b. Show splash screen before entering the menu
     displayManager.showSplash();
+
+    // 3c. Mount storage after TFT initialization. Both devices use the same
+    // HSPI controller and shared SCK/MOSI lines with independent CS pins.
+    if (!sessionRecorder.begin()) {
+        Serial.println("Session recorder unavailable: " + String(sessionRecorder.lastError()));
+    }
+    if (!luaEngine.begin()) Serial.println("Lua: " + String(luaEngine.lastError()));
 
     // 4. Initialize nRF24L01+ Radio (init() retries internally before failing)
     if (!radioManager.init()) {
@@ -168,7 +171,7 @@ void loop() {
 
     if (appState.appMode == APP_MODE_SHUTDOWN) {
         delay(900); // Keep the shutdown confirmation visible briefly.
-        while (digitalRead(BTN_RIGHT) == LOW) delay(10);
+        while (digitalRead(BTN_A) == LOW) delay(10);
         delay(50);
         Serial.println("SYSTEM SHUTDOWN: entering deep sleep...");
         displayManager.prepareForShutdown();

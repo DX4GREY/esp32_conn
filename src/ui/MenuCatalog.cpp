@@ -34,6 +34,7 @@ constexpr MenuFeature FEATURES[MenuCatalog::FEATURE_COUNT] = {
     ,{"RX ONLY",  APP_MODE_ENV_PROBE,          6, MENU_OPEN_STOP_RADIOS}
 #endif
     ,{"LUA SCRIPTS",APP_MODE_LUA_SCRIPTS,      9, MENU_OPEN_STOP_RADIOS}
+    ,{"SD FILES", APP_MODE_FILE_EXPLORER,      12, MENU_OPEN_STOP_RADIOS}
 };
 
 constexpr const char* PAGE_TITLES[MenuCatalog::PAGE_COUNT] = {
@@ -44,7 +45,7 @@ constexpr const char* PAGE_TITLES[MenuCatalog::PAGE_COUNT] = {
     "SCRIPTING"
 };
 
-constexpr uint8_t PAGE_ITEM_COUNTS[MenuCatalog::PAGE_COUNT] = {6, 6, 6, 2, 1};
+constexpr uint8_t PAGE_ITEM_COUNTS[MenuCatalog::PAGE_COUNT] = {6, 6, 6, 2, 2};
 
 }  // namespace
 

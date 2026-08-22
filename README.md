@@ -93,10 +93,11 @@ Place each decoupling capacitor as close as possible to the corresponding radio'
 | VCC | Match the module, typically 3.3 V |
 | GND | GND |
 
-For a TFT module with a microSD slot, connect the slot's `SD_CS` to GPIO 3 and
+For a TFT module with a microSD slot, connect the slot's `SD_CS` to GPIO 1 and
 `SD_MISO` to GPIO 21. The slot shares `SCK` (GPIO 18) and `MOSI` (GPIO 17) with
 the display. Override `SD_CS_PIN` and `SD_MISO_PIN` in `build_flags` if your
-board uses different wiring. Use a FAT16/FAT32-formatted card.
+board uses different wiring. GPIO 3 is intentionally avoided because it is
+used by boot/JTAG-related board functions. Use a FAT16/FAT32-formatted card.
 
 The firmware initializes the display with `INITR_BLACKTAB` and rotation `3`. If colors, offsets, or orientation are incorrect, check the panel variant in `DisplayManager::init()`.
 
@@ -107,7 +108,7 @@ All buttons use `INPUT_PULLUP` and are active-low. Connect one side of each butt
 | Button | ESP32-S3 GPIO | General purpose |
 |---|---:|---|
 | UP | 10 | Previous item or change analyzer band |
-| RIGHT | 9 | Open, confirm, or perform an action |
+| A | 9 | Open, confirm, or perform an action |
 | DOWN | 8 | Next item or change analyzer mode |
 | B | 5 | Back or switch main-menu page |
 
@@ -174,7 +175,7 @@ page and selection remain in memory while the device is powered.
 | Control | Main-menu action |
 |---|---|
 | `UP` / `DOWN` | Move between feature cards |
-| `RIGHT` | Open the selected feature |
+| `A` | Open the selected feature |
 | `B` | Advance to the next menu page |
 | `UP` at the first item | Move to the previous page and select its last item |
 | `DOWN` at the last item | Move to the next page and select its first item |
@@ -183,23 +184,23 @@ page and selection remain in memory while the device is powered.
 
 | Feature | Purpose | Controls |
 |---|---|---|
-| Spectrum | Live/average/max/delta graph, cursor, zoom, confidence, and hold | Live: tap `UP`: band, tap `DOWN`: radio mode. Frozen: tap `UP/DOWN`: cursor. Tap `RIGHT`: freeze/resume; hold `UP`: trace, hold `DOWN`: zoom, hold `RIGHT`: baseline, hold `B`: watch marker |
-| Waterfall | Last 24 sweeps, newest at the top | `UP`: band, `DOWN`: radio mode, `RIGHT`: clear history |
-| Inspect | Deeper observation of one RF channel | `UP/DOWN`: channel ±1, `RIGHT`: channel +10 |
-| Survey | Top five average channel occupancies | `UP/DOWN`: change band and reset, `RIGHT`: reset survey |
-| Events | Events that satisfy threshold, hysteresis, duration, and channel-count rules | Tap `UP/DOWN`: threshold/hysteresis; hold `UP/DOWN`: duration/channel count; `RIGHT`: clear |
-| Logging | Record complete sweeps to LittleFS and summaries to USB Serial | `RIGHT`: start or stop a new session |
+| Spectrum | Live/average/max/delta graph, cursor, zoom, confidence, and hold | Live: tap `UP`: band, tap `DOWN`: radio mode. Frozen: tap `UP/DOWN`: cursor. Tap `A`: freeze/resume; hold `UP`: trace, hold `DOWN`: zoom, hold `A`: baseline, hold `B`: watch marker |
+| Waterfall | Last 24 sweeps, newest at the top | `UP`: band, `DOWN`: radio mode, `A`: clear history |
+| Inspect | Deeper observation of one RF channel | `UP/DOWN`: channel ±1, `A`: channel +10 |
+| Survey | Top five average channel occupancies | `UP/DOWN`: change band and reset, `A`: reset survey |
+| Events | Events that satisfy threshold, hysteresis, duration, and channel-count rules | Tap `UP/DOWN`: threshold/hysteresis; hold `UP/DOWN`: duration/channel count; `A`: clear |
+| Logging | Record complete sweeps to LittleFS and summaries to USB Serial | `A`: start or stop a new session |
 
 ### Page 2 — Tools
 
 | Feature | Purpose | Controls |
 |---|---|---|
-| RX Only / RF Test | RX-only notice in the default profile; controlled transmission screen in the lab profile | Lab profile: `UP/DOWN`: target, `RIGHT`: start or stop |
-| Radio Diag | Check Radio 1 and Radio 2 connectivity | `RIGHT`: refresh |
-| Profiles | Select analyzer sampling depth | `UP/DOWN`: profile, `RIGHT`: change CUSTOM value |
-| Settings | Configure RF power, dwell time, display theme, and Grid/List menu layout | `UP/DOWN`: select field, `RIGHT`: next value |
-| Status | Hardware, memory, radio/software, and performance data | `UP/DOWN`: page, `RIGHT`: refresh |
-| Power | Restart or enter deep sleep | `UP/DOWN`: option, `RIGHT`: confirm |
+| RX Only / RF Test | RX-only notice in the default profile; controlled transmission screen in the lab profile | Lab profile: `UP/DOWN`: target, `A`: start or stop |
+| Radio Diag | Check Radio 1 and Radio 2 connectivity | `A`: refresh |
+| Profiles | Select analyzer sampling depth | `UP/DOWN`: profile, `A`: change CUSTOM value |
+| Settings | Configure RF power, dwell time, display theme, and Grid/List menu layout | `UP/DOWN`: select field, `A`: next value |
+| Status | Hardware, memory, radio/software, and performance data | `UP/DOWN`: page, `A`: refresh |
+| Power | Restart or enter deep sleep | `UP/DOWN`: option, `A`: confirm |
 
 Press `B` to return to the main menu from any feature screen.
 
@@ -207,19 +208,19 @@ Press `B` to return to the main menu from any feature screen.
 
 | Feature | Purpose | Controls |
 |---|---|---|
-| Occupancy | Per-channel carrier-hit occupancy and top channels | `RIGHT`: start/stop sampling |
-| Heatmap | Circular time history across channel groups | `RIGHT`: start/stop sampling |
-| Bursts | Recent activity increases relative to the moving baseline | `RIGHT`: start/stop; `UP/DOWN`: browse events |
-| Compare | Compare 2–4 configured RF channels | `RIGHT`: start/stop sampling |
-| RF Status | Overall relative score, sample rate, cycles, and strongest channel | `RIGHT`: start/stop sampling |
-| BEF/AFT | Capture two in-RAM snapshots and display their difference | `RIGHT`: capture Before, then After; `UP/DOWN`: channel |
+| Occupancy | Per-channel carrier-hit occupancy and top channels | `A`: start/stop sampling |
+| Heatmap | Circular time history across channel groups | `A`: start/stop sampling |
+| Bursts | Recent activity increases relative to the moving baseline | `A`: start/stop; `UP/DOWN`: browse events |
+| Compare | Compare 2–4 configured RF channels | `A`: start/stop sampling |
+| RF Status | Overall relative score, sample rate, cycles, and strongest channel | `A`: start/stop sampling |
+| BEF/AFT | Capture two in-RAM snapshots and display their difference | `A`: capture Before, then After; `UP/DOWN`: channel |
 
 ### Page 4 — ENV MORE
 
 | Feature | Purpose | Controls |
 |---|---|---|
 | Band Info | Show possible Wi-Fi, BLE/Bluetooth, and Zigbee overlap at a frequency | `UP/DOWN`: RF channel |
-| RX Only / Auth Probe | RX-only notice, or bounded probe controls in the lab build | Lab build: `UP/DOWN`: field, `RIGHT`: change/action |
+| RX Only / Auth Probe | RX-only notice, or bounded probe controls in the lab build | Lab build: `UP/DOWN`: field, `A`: change/action |
 
 The environment labels are frequency-region hints, not protocol detection, and
 all percentages and scores are relative carrier-detection metrics rather than
@@ -264,7 +265,7 @@ If only one module is detected, requests that require the missing receiver trans
 | FAST | 12 samples/channel | 50 samples | Fastest refresh |
 | BALANCED | 30 samples/channel | 100 samples | Default |
 | DEEP | 60 samples/channel | 200 samples | More stable, slower sweeps |
-| CUSTOM | 10–100 samples/channel | 2× spectrum value, capped at 200 | Adjustable with `RIGHT` |
+| CUSTOM | 10–100 samples/channel | 2× spectrum value, capped at 200 | Adjustable with `A` |
 
 The selected profile and CUSTOM sample count are stored in NVS.
 
@@ -333,7 +334,7 @@ Select `Tools → Power → Shutdown`. The firmware will:
 2. Disable the TFT and place its controller into sleep mode.
 3. Put the ESP32-S3 into deep sleep.
 
-To wake the device, hold `RIGHT` for approximately 1.5 seconds. A short press returns the device to deep sleep, preventing accidental boots caused by contact noise.
+To wake the device, hold `A` for approximately 1.5 seconds. A short press returns the device to deep sleep, preventing accidental boots caused by contact noise.
 
 Deep sleep is a very-low-power software shutdown, not physical power disconnection. The board regulator, power LED, and external peripherals may still draw current. A hardware power latch or load switch is required to disconnect the supply completely.
 
@@ -447,7 +448,7 @@ The complete manual is indexed in [docs/README.md](docs/README.md). It includes 
 
 ### The device does not wake from shutdown
 
-- Hold `RIGHT`/GPIO 9 for at least approximately 1.5 seconds.
+- Hold `A`/GPIO 9 for at least approximately 1.5 seconds.
 - Confirm that the button connects GPIO 9 to GND and has no external pull-down.
 - Deep-sleep wake depends on an RTC-capable GPIO, so preserve this pin assignment when changing the wiring.
 

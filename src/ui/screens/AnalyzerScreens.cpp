@@ -66,7 +66,7 @@ void DisplayManager::drawSpectrumGrid() {
     String modeChip = "D ";
     modeChip += appState.analyzerFrozen ? "CH-" : appState.getAnalyzerRadioModeName();
     drawFooterChip(41, 37, modeChip.c_str());
-    drawFooterChip(80, 37, appState.analyzerFrozen ? "R LIVE" : "R HOLD");
+    drawFooterChip(80, 37, appState.analyzerFrozen ? "A LIVE" : "A HOLD");
     drawFooterChip(119, 39, "B BACK");
 }
 
@@ -231,7 +231,7 @@ void DisplayManager::renderWaterfallScreen() {
         tft.print("NEW");
         tft.setCursor(1, 82);
         tft.print("OLD");
-        drawModernFooter("U BAND", "R CLEAR", "B BACK");
+        drawModernFooter("U BAND", "A CLEAR", "B BACK");
         needRedraw = false;
     }
 
@@ -253,7 +253,7 @@ void DisplayManager::renderSurveyScreen() {
         drawModernHeader("CHANNEL SURVEY", SPECTRUM_LOW);
         tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
         tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
-        drawModernFooter("", "R RESET", "B BACK");
+        drawModernFooter("", "A RESET", "B BACK");
         needRedraw = false;
     }
 
@@ -308,7 +308,7 @@ void DisplayManager::renderEventsScreen() {
         drawModernHeader("RF EVENTS", SPECTRUM_HIGH);
         tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
         tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
-        drawModernFooter("U T/D H", "R CLEAR", "B BACK");
+        drawModernFooter("U T/D H", "A CLEAR", "B BACK");
         needRedraw = false;
     }
 
@@ -378,7 +378,7 @@ void DisplayManager::renderLoggingScreen() {
     } else {
         tft.print("STORAGE UNAVAILABLE");
     }
-    drawModernFooter("", "R TOGGLE", "B BACK");
+    drawModernFooter("", "A TOGGLE", "B BACK");
     needRedraw = false;
 }
 
@@ -400,7 +400,7 @@ void DisplayManager::renderRadioDiagScreen() {
         tft.setTextColor(ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL, SPECTRUM_CARD_BG);
         tft.print(ok ? "CONNECTED" : "NOT DETECTED");
     }
-    drawModernFooter("", "R REFRESH", "B BACK");
+    drawModernFooter("", "A REFRESH", "B BACK");
     needRedraw = false;
 }
 
@@ -428,7 +428,7 @@ void DisplayManager::renderProfilesScreen() {
         tft.print(samples[profile]);
         tft.print(" smp");
     }
-    drawModernFooter("U/D SET", "R VALUE", "B BACK");
+    drawModernFooter("U/D SET", "A VALUE", "B BACK");
     needRedraw = false;
 }
 
@@ -477,7 +477,7 @@ void DisplayManager::renderChannelInspector() {
         tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
         tft.print("LIVE SIGNAL");
         tft.drawRoundRect(10, 62, 140, 13, 3, SPECTRUM_BORDER);
-        drawModernFooter("U/D +/-", "R +10", "B BACK");
+        drawModernFooter("U/D +/-", "A +10", "B BACK");
 
         needRedraw = false;
         previousInspectedLevel = 0xFF;

@@ -31,6 +31,14 @@ private:
     size_t luaScriptCount = 0;
     size_t luaScriptSelection = 0;
     String luaRunStatus;
+    static constexpr size_t FILE_UI_MAX_ENTRIES = 32;
+    String fileNames[FILE_UI_MAX_ENTRIES];
+    uint32_t fileSizes[FILE_UI_MAX_ENTRIES] = {};
+    bool fileDirectories[FILE_UI_MAX_ENTRIES] = {};
+    size_t fileEntryCount = 0;
+    size_t fileSelection = 0;
+    String filePath = "/";
+    String fileStatus;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -111,6 +119,7 @@ private:
     void renderPowerScreen();
     void renderRfEnvironmentScreen();
     void renderLuaScriptsScreen();
+    void renderFileExplorerScreen();
     void renderRebootScreen();
     void renderShutdownScreen();
 
@@ -125,6 +134,7 @@ private:
     void drawModernHeader(const char* title, uint16_t accent);
     void drawModernFooter(const char* left, const char* middle, const char* right);
     void drawFooterChip(int x, int width, const char* label);
+    void loadFileExplorerDirectory();
 };
 
 extern DisplayManager displayManager;

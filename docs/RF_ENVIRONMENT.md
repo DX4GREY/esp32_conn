@@ -20,12 +20,12 @@ environment page, `B` requests analyzer/probe stop and returns to the menu.
 
 | Screen | What it shows | Controls |
 |---|---|---|
-| Occupancy | Per-channel moving occupancy, average, peak, and top channels | `RIGHT`: start/stop |
-| Heatmap | Up to 32 circular time buckets across grouped RF channels | `RIGHT`: start/stop |
-| Bursts | Up to 32 increases above the moving baseline, with LOW/MEDIUM/HIGH severity | `RIGHT`: start/stop; `UP/DOWN`: browse |
-| Compare | Moving activity for the configured 2–4 RF channels | `RIGHT`: start/stop |
-| RF Status | Running state, cycle/rate data, average, strongest channel, and relative score | `RIGHT`: start/stop |
-| BEF/AFT | Two snapshots and signed per-channel change | `RIGHT`: capture Before, then After; `UP/DOWN`: channel |
+| Occupancy | Per-channel moving occupancy, average, peak, and top channels | `A`: start/stop |
+| Heatmap | Up to 32 circular time buckets across grouped RF channels | `A`: start/stop |
+| Bursts | Up to 32 increases above the moving baseline, with LOW/MEDIUM/HIGH severity | `A`: start/stop; `UP/DOWN`: browse |
+| Compare | Moving activity for the configured 2–4 RF channels | `A`: start/stop |
+| RF Status | Running state, cycle/rate data, average, strongest channel, and relative score | `A`: start/stop |
+| BEF/AFT | Two snapshots and signed per-channel change | `A`: capture Before, then After; `UP/DOWN`: channel |
 | Band Info | Frequency and possible protocol-region overlap | `UP/DOWN`: RF channel |
 | RX Only / Auth Probe | Receive-only notice, or bounded probe editor in the lab profile | See Authorized probe below |
 
@@ -41,7 +41,7 @@ holds the latest 32 events.
 
 ## Before/After snapshots
 
-The first `RIGHT` press captures Before; the next captures After. Each snapshot
+The first `A` press captures Before; the next captures After. Each snapshot
 contains average and peak activity, peak channel, relative score, burst count,
 and all 126 channel occupancies. Snapshots remain in RAM and disappear after a
 restart or factory reset. If session recording is active, a compact `E` summary
@@ -97,7 +97,7 @@ authorized testing. Its configurable bounds are:
 | Data rate (Serial only) | 250 kbps, 1 Mbps, 2 Mbps | 1 Mbps |
 
 On-device, use `UP/DOWN` to select Channel, Interval, Packets, Duration, or
-Start/Stop. `RIGHT` advances the selected value or explicitly starts/stops the
+Start/Stop. `A` advances the selected value or explicitly starts/stops the
 probe. The run stops at the first of packet limit, duration limit, or operator
 stop, then returns the radio to RX. Pressing `B` is the immediate operator stop
 and exit path. Read [Safety and Authorized Use](SAFETY.md) before using this

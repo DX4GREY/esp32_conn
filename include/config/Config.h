@@ -34,17 +34,20 @@
 // the display and expose separate SD_MISO and SD_CS pins. Override these with
 // PlatformIO build_flags when your carrier board is wired differently.
 #ifndef SD_CS_PIN
-#define SD_CS_PIN   3
+#define SD_CS_PIN   1
 #endif
 #ifndef SD_MISO_PIN
 #define SD_MISO_PIN 21
 #endif
 #define SD_SCK_PIN  TFT_SCK
 #define SD_MOSI_PIN TFT_SDA
+#ifndef SD_SPI_FREQUENCY
+#define SD_SPI_FREQUENCY 4000000U
+#endif
 
 // Navigation Buttons (Active LOW / Internal Pull-Up)
 #define BTN_UP    10
-#define BTN_RIGHT 9
+#define BTN_A     9
 #define BTN_DOWN  8
 #define BTN_B     5
 

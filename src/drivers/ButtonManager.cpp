@@ -4,14 +4,14 @@ ButtonManager buttonManager;
 
 void ButtonManager::init() {
     pinMode(BTN_UP, INPUT_PULLUP);
-    pinMode(BTN_RIGHT, INPUT_PULLUP);
+    pinMode(BTN_A, INPUT_PULLUP);
     pinMode(BTN_DOWN, INPUT_PULLUP);
     pinMode(BTN_B, INPUT_PULLUP);
 }
 
 int ButtonManager::getPinIndex(int pin) {
     if (pin == BTN_UP) return 0;
-    if (pin == BTN_RIGHT) return 1;
+    if (pin == BTN_A) return 1;
     if (pin == BTN_DOWN) return 2;
     if (pin == BTN_B) return 3;
     return -1;

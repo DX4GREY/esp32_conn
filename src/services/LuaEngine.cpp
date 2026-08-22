@@ -1,5 +1,6 @@
 #include "services/LuaEngine.h"
 #include "services/StorageManager.h"
+#include <dirent.h>
 #include "core/AppState.h"
 #include "drivers/RadioManager.h"
 #include "services/SessionRecorder.h"
@@ -234,33 +235,30 @@ bool LuaEngine::run(const String& requestedName, Stream& output) {
 
 void LuaEngine::list(Stream& output) const {
     if (!ready) { output.println("Lua scripts require an SD card."); return; }
-    File dir = storageManager.filesystem().open(storageManager.scriptsPath());
-    if (!dir || !dir.isDirectory()) { output.println("No scripts directory."); return; }
+    DIR* dir = opendir("/sd/RFSuite/scripts");
+    if (!dir) { output.println("No scripts directory."); return; }
     bool found = false;
-    for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
-        if (!file.isDirectory() && String(file.name()).endsWith(".lua")) {
-            output.printf("%s (%u bytes)\n", file.name(), static_cast<unsigned>(file.size()));
+    for (dirent* entry = readdir(dir); entry; entry = readdir(dir)) {
+        const String name(entry->d_name);
+        if (name.endsWith(".lua")) {
+            output.println(name);
             found = true;
         }
     }
     if (!found) output.println("No .lua scripts found.");
-    dir.close();
+    closedir(dir);
 }
 
 size_t LuaEngine::listScripts(String* names, size_t capacity) const {
     if (!ready) return 0;
-    File dir = storageManager.filesystem().open(storageManager.scriptsPath());
-    if (!dir || !dir.isDirectory()) return 0;
+    DIR* dir = opendir("/sd/RFSuite/scripts");
+    if (!dir) return 0;
     size_t count = 0;
-    for (File file = dir.openNextFile(); file && count < capacity; file = dir.openNextFile()) {
-        if (!file.isDirectory()) {
-            String name = file.name();
-            const int slash = name.lastIndexOf('/');
-            if (slash >= 0) name = name.substring(slash + 1);
-            if (name.endsWith(".lua")) names[count++] = name;
-        }
+    for (dirent* entry = readdir(dir); entry && count < capacity; entry = readdir(dir)) {
+        const String name(entry->d_name);
+        if (name.endsWith(".lua")) names[count++] = name;
     }
-    dir.close();
+    closedir(dir);
     for (size_t i = 0; i < count; ++i)
         for (size_t j = i + 1; j < count; ++j)
             if (names[j] < names[i]) { String swap = names[i]; names[i] = names[j]; names[j] = swap; }

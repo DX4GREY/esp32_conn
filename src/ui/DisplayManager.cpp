@@ -1,12 +1,13 @@
 #include "ui/DisplayManager.h"
 #include "ui/DisplaySupport.h"
+#include "drivers/DisplayStorageBus.h"
 
 using namespace DisplayUi;
 
 DisplayManager displayManager;
 
 DisplayManager::DisplayManager()
-    : tft(TFT_CS, TFT_AO, TFT_SDA, TFT_SCK, TFT_RST) {
+    : tft(&displayStorageSpi(), TFT_CS, TFT_AO, TFT_RST) {
     resetDynamicCaches();
 }
 
@@ -57,6 +58,11 @@ void DisplayManager::resetDynamicCaches() {
 }
 
 void DisplayManager::init() {
+    // Keep the SD card deselected while the shared hardware SPI bus and TFT
+    // are initialized. StorageManager later mounts SD on this same bus.
+    pinMode(SD_CS_PIN, OUTPUT);
+    digitalWrite(SD_CS_PIN, HIGH);
+    displayStorageSpi().begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     tft.initR(INITR_BLACKTAB);   // ST7735 128x160
     tft.setRotation(3);          // Landscape 160 x 128
     tft.fillScreen(ST77XX_BLACK);

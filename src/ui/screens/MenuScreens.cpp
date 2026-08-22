@@ -81,6 +81,11 @@ void DisplayManager::drawMenuIcon(int index, int centerX, int centerY,
             tft.fillRect(centerX - 2, centerY - 8, 5, 7, background);
             tft.drawFastVLine(centerX, centerY - 8, 9, color);
             break;
+        case 12: // Folder / SD file explorer
+            tft.drawRoundRect(centerX - 9, centerY - 5, 18, 12, 2, color);
+            tft.fillRect(centerX - 7, centerY - 8, 8, 4, color);
+            tft.drawFastHLine(centerX - 6, centerY, 12, color);
+            break;
     }
 }
 
@@ -166,7 +171,7 @@ void DisplayManager::renderMainMenu() {
         drawMenuItem(i, i == menuSelection);
     }
 
-    drawModernFooter("U/D MOVE", "B PAGE", "R OPEN");
+    drawModernFooter("U/D MOVE", "B PAGE", "A OPEN");
 }
 
 // =============================================================================
@@ -203,7 +208,7 @@ void DisplayManager::renderJammerScreen() {
         tft.fillRoundRect(5, 54, 150, 34, 4, SPECTRUM_CARD_BG);
         tft.drawRoundRect(5, 54, 150, 34, 4, SPECTRUM_BORDER);
         tft.fillRoundRect(5, 92, 150, 11, 3, SPECTRUM_CARD_BG);
-        drawModernFooter("U/D TGT", "R START", "B STOP");
+        drawModernFooter("U/D TGT", "A START", "B STOP");
         jammerLayoutDrawn = true;
     }
 
@@ -241,7 +246,7 @@ void DisplayManager::renderJammerScreen() {
             tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
             tft.print("READY / STANDBY");
         }
-        drawFooterChip(56, 49, appState.jamming ? "R STOP" : "R START");
+        drawFooterChip(56, 49, appState.jamming ? "A STOP" : "A START");
         previousJamming = appState.jamming;
         previousJamChannel = -1;
         previousJamChannel2 = -1;

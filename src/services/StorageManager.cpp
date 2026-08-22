@@ -1,15 +1,11 @@
 #include "services/StorageManager.h"
 #include "config/Config.h"
+#include "drivers/DisplayStorageBus.h"
 #include <LittleFS.h>
 #include <SD.h>
 #include <SPI.h>
 
 StorageManager storageManager;
-
-namespace {
-// Keep the SD card off the RF24 controller (the global SPI object uses FSPI).
-SPIClass sdSpi(HSPI);
-}
 
 bool StorageManager::ensureDirectory(fs::FS& fs, const char* path) {
     if (fs.exists(path)) return true;
@@ -27,22 +23,41 @@ bool StorageManager::ensureDirectory(fs::FS& fs, const char* path) {
 bool StorageManager::begin() {
     pinMode(SD_CS_PIN, OUTPUT);
     digitalWrite(SD_CS_PIN, HIGH);
-    sdSpi.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
-    sdMounted = SD.begin(SD_CS_PIN, sdSpi, 10000000U) && SD.cardType() != CARD_NONE;
+    SPIClass& sharedSpi = displayStorageSpi();
+    sharedSpi.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+    // 4 MHz is deliberately conservative for TFT carrier boards: their SD
+    // traces, level shifters, and shared SCK/MOSI wiring are often unreliable
+    // at 10 MHz even though the card-identification commands still succeed.
+    sdMounted = SD.begin(SD_CS_PIN, sharedSpi, SD_SPI_FREQUENCY,
+                         "/sd", 8, false) &&
+                SD.cardType() != CARD_NONE && SD.cardSize() > 0;
     sdState = sdMounted ? "mounted" : "not detected";
     if (sdMounted) {
+        Serial.printf("Storage: SD SPI=%lu Hz, physical=%llu, volume=%llu bytes\n",
+                      static_cast<unsigned long>(SD_SPI_FREQUENCY),
+                      SD.cardSize(), SD.totalBytes());
+        if (SD.totalBytes() == 0) {
+            sdState = "filesystem error";
+            Serial.println("Storage: FAT volume metadata cannot be read");
+        }
         if (!ensureDirectory(SD, "/RFSuite/log") ||
             !ensureDirectory(SD, "/RFSuite/scripts")) {
-            SD.end();
-            sdMounted = false;
+            // Keep a successfully mounted card available for read-only tasks
+            // such as File Explorer and loading existing Lua scripts. A card
+            // with a damaged/read-only FAT volume may reject mkdir(), but
+            // unmounting it here incorrectly turns that into "not ready" and
+            // hides files that can still be read.
             sdState = "directory error";
+            Serial.println("Storage: SD mounted, but RFSuite folders could not be created");
         }
     }
 
     // Keep flash available as a transparent recorder fallback.
     flashMounted = LittleFS.begin(true);
     Serial.printf("Storage: %s%s\n", backendName(),
-                  sdMounted ? " mounted at /RFSuite" : " fallback");
+                  sdMounted && strcmp(sdState, "mounted") == 0
+                      ? " mounted at /RFSuite"
+                      : (sdMounted ? " mounted with directory error" : " fallback"));
     return sdMounted || flashMounted;
 }
 

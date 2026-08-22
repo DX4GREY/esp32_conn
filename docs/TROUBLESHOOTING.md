@@ -13,7 +13,7 @@
 
 This is normally not an error. It means the LittleFS recorder is inactive.
 
-Start it from Analyze → Logging with `RIGHT`, or:
+Start it from Analyze → Logging with `A`, or:
 
 ```text
 session start
@@ -123,7 +123,7 @@ This resets NVS but does not remove the LittleFS session.
 
 ## Device does not wake
 
-- Hold `RIGHT` continuously for approximately 1.5 seconds.
+- Hold `A` continuously for approximately 1.5 seconds.
 - Confirm GPIO 9 is pulled high when idle and grounded when pressed.
 - Remove external pull-downs.
 - Confirm any pin remap kept an RTC-capable wake GPIO.

@@ -11,7 +11,7 @@ can render them as a 2 × 3 card grid or a four-row scrolling list.
 | Main-menu control | Action |
 |---|---|
 | `UP` / `DOWN` | Move selection between cards |
-| `RIGHT` | Open selected card |
+| `A` | Open selected card |
 | `B` | Advance to the next menu page |
 | `UP` at the first item | Open the previous page at its last item |
 | `DOWN` at the last item | Open the next page at its first item |
@@ -26,10 +26,10 @@ Displays the selected trace across the current band. The header reports peak cha
 |---|---|---|
 | Tap `UP` | Next scan band | Cursor +1 channel |
 | Tap `DOWN` | Next radio mode | Cursor −1 channel |
-| Tap `RIGHT` | Freeze | Resume and restore peak-follow cursor |
+| Tap `A` | Freeze | Resume and restore peak-follow cursor |
 | Hold `UP` | Cycle `LIVE → AVG → MAX → DELTA` | Same |
 | Hold `DOWN` | Cycle zoom `1× → 2× → 4×` | Same |
-| Hold `RIGHT` | Capture baseline and select `DELTA` | Same |
+| Hold `A` | Capture baseline and select `DELTA` | Same |
 | Hold `B` | Toggle watch marker at cursor | Same |
 | Tap `B` | Stop radios and return to menu | Same |
 
@@ -43,7 +43,7 @@ Shows up to 24 completed sweeps, newest at the top.
 |---|---|
 | `UP` | Next band |
 | `DOWN` | Next radio mode |
-| `RIGHT` | Clear waterfall history |
+| `A` | Clear waterfall history |
 | `B` | Return to menu |
 
 ### Inspect
@@ -54,7 +54,7 @@ Observes one channel with a deeper sample count. It displays RF channel, derived
 |---|---|
 | `UP` | Channel +1 |
 | `DOWN` | Channel −1 |
-| `RIGHT` | Channel +10 with wraparound |
+| `A` | Channel +10 with wraparound |
 | `B` | Return to menu |
 
 ### Survey
@@ -64,7 +64,7 @@ Ranks the five channels with the highest average carrier-hit occupancy within th
 | Control | Action |
 |---|---|
 | `UP` or `DOWN` | Change band and reset survey accumulation |
-| `RIGHT` | Reset survey accumulation |
+| `A` | Reset survey accumulation |
 | `B` | Return to menu |
 
 ### Events
@@ -82,7 +82,7 @@ Shows recent events and the active configuration as `T`, `H`, `D`, and `M`.
 | Tap `DOWN` | Hysteresis +5; wraps from 30 to 0 |
 | Hold `UP` | Duration +1; wraps from 5 to 1 in the UI |
 | Hold `DOWN` | Minimum channels +1; wraps from 4 to 1 in the UI |
-| `RIGHT` | Clear event history |
+| `A` | Clear event history |
 | `B` | Return to menu |
 
 The Serial CLI supports the wider validated ranges documented in [Serial CLI](SERIAL_CLI.md).
@@ -93,7 +93,7 @@ Controls the LittleFS session recorder and USB `RFLOG` summaries.
 
 | Control | Action |
 |---|---|
-| `RIGHT` | Start a new session or stop the current one |
+| `A` | Start a new session or stop the current one |
 | `B` | Return to menu without automatically stopping an active session |
 
 Starting a session replaces the previous session file. `STOPPED` is the normal inactive state. See [Data and Storage](DATA_AND_STORAGE.md).
@@ -109,14 +109,14 @@ In the lab build only:
 | Control | Action |
 |---|---|
 | `UP` / `DOWN` | Change the predefined laboratory target group |
-| `RIGHT` | Start or stop the selected test |
+| `A` | Start or stop the selected test |
 | `B` | Stop and return to menu |
 
 Use only under the restrictions in [Safety and Authorized Use](SAFETY.md).
 
 ### Radio Diag
 
-Reports SPI connectivity separately for R1 and R2. Press `RIGHT` to refresh and `B` to return.
+Reports SPI connectivity separately for R1 and R2. Press `A` to refresh and `B` to return.
 
 ### Profiles
 
@@ -127,11 +127,11 @@ Reports SPI connectivity separately for R1 and R2. Press `RIGHT` to refresh and 
 | DEEP | 60 | 200 | More observations, slower sweep |
 | CUSTOM | 10–100 | 2× spectrum, capped at 200 | User-selected depth |
 
-Use `UP/DOWN` to select a profile. When CUSTOM is active, `RIGHT` increments the sample count by 10 and wraps after 100.
+Use `UP/DOWN` to select a profile. When CUSTOM is active, `A` increments the sample count by 10 and wraps after 100.
 
 ### Settings
 
-Use `UP/DOWN` to select and `RIGHT` to advance the value.
+Use `UP/DOWN` to select and `A` to advance the value.
 
 | Setting | Values | Notes |
 |---|---|---|
@@ -142,7 +142,7 @@ Use `UP/DOWN` to select and `RIGHT` to advance the value.
 
 ### Status
 
-Use `UP/DOWN` to change page, `RIGHT` to refresh, and `B` to return.
+Use `UP/DOWN` to change page, `A` to refresh, and `B` to return.
 
 1. **Device Info**: chip model, revision/cores, CPU, flash size, flash clock, uptime.
 2. **Memory Info**: total/free/minimum heap, largest allocation, sketch use, PSRAM.
@@ -159,11 +159,11 @@ In both cases the firmware uses its flash fallback.
 
 ### Power
 
-Choose Restart or Shutdown with `UP/DOWN`, confirm with `RIGHT`, or cancel with `B`.
+Choose Restart or Shutdown with `UP/DOWN`, confirm with `A`, or cancel with `B`.
 
 - Restart calls a firmware reboot after showing the restart screen.
 - Shutdown enters deep sleep after stopping radios and preparing the display.
-- To wake, hold `RIGHT` for about 1.5 seconds. A short or noisy wake press returns to sleep.
+- To wake, hold `A` for about 1.5 seconds. A short or noisy wake press returns to sleep.
 
 ## Runtime versus persistent state
 

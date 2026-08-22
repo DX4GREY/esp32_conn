@@ -21,7 +21,7 @@ Copy plain-text Lua 5.1 files into `/RFSuite/scripts/`. A script is limited to
 1. Open the `SCRIPTING` menu page.
 2. Select `LUA SCRIPTS`.
 3. Use `UP` and `DOWN` to select a `.lua` file.
-4. Press `RIGHT` to run it. Press `B` to return to the menu.
+4. Press `A` to run it. Press `B` to return to the menu.
 
 Removing or inserting a card while powered is not supported. Reboot after
 changing the card. Script `print()` output is sent to USB Serial at 115200 baud;

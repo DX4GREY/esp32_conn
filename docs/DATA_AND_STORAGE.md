@@ -16,13 +16,13 @@ See [Persistence](PERSISTENCE.md) for NVS details.
 
 ## Starting and stopping recording
 
-Start from Analyze → Logging with `RIGHT`, or over Serial:
+Start from Analyze → Logging with `A`, or over Serial:
 
 ```text
 session start
 ```
 
-Starting recording removes the previous session CSV on the active storage backend and creates a new v1 header. Stop with `RIGHT` on the Logging page or:
+Starting recording removes the previous session CSV on the active storage backend and creates a new v1 header. Stop with `A` on the Logging page or:
 
 ```text
 session stop

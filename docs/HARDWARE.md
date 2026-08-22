@@ -47,10 +47,12 @@ The firmware configures this shared bus for SPI mode 0, MSB first, at 16 MHz. A 
 | SD SCK | 18 (shared with TFT) |
 | SD MOSI | 17 (shared with TFT) |
 | SD MISO | 21 |
-| SD CS | 3 |
+| SD CS | 1 |
 
 The SD controller uses HSPI so it does not contend with the RF24 FSPI bus.
 Pins can be overridden with `SD_CS_PIN` and `SD_MISO_PIN` build flags.
+GPIO 3 is intentionally avoided because it is used by boot/JTAG-related board
+functions.
 
 The display is initialized as `INITR_BLACKTAB` with rotation `3`. Different ST7735 panel variants may require a different initialization tab, color order, offset, or rotation.
 
@@ -59,7 +61,7 @@ The display is initialized as `INITR_BLACKTAB` with rotation `3`. Different ST77
 | Button | GPIO | Electrical behavior |
 |---|---:|---|
 | `UP` | 10 | Connect to GND when pressed |
-| `RIGHT` | 9 | Connect to GND when pressed |
+| `A` | 9 | Connect to GND when pressed |
 | `DOWN` | 8 | Connect to GND when pressed |
 | `B` | 5 | Connect to GND when pressed |
 
@@ -97,7 +99,7 @@ Shutdown performs a software power-down sequence:
 
 1. Stops radio activity.
 2. Prepares the TFT for shutdown.
-3. Enables active-low wake on `RIGHT`/GPIO 9.
+3. Enables active-low wake on `A`/GPIO 9.
 4. Enters ESP32 deep sleep.
 
 Deep sleep does not physically disconnect the regulator, power LED, TFT board, or other peripherals. Use a load switch or power-latch circuit when true supply disconnection is required.

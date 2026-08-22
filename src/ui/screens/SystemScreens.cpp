@@ -24,7 +24,7 @@ String formatStorageBytes(uint64_t bytes) {
 void DisplayManager::renderSettingsScreen() {
     if (!settingsLayoutDrawn) {
         drawModernHeader("RF SETTINGS", SPECTRUM_HIGH);
-        drawModernFooter("U/D SEL", "R NEXT", "B BACK");
+        drawModernFooter("U/D SEL", "A NEXT", "B BACK");
         settingsLayoutDrawn = true;
     }
 
@@ -152,7 +152,7 @@ void DisplayManager::renderStatusScreen() {
         tft.print("/5");
         tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
         tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
-        drawModernFooter("U/D PAGE", "R REF", "B BACK");
+        drawModernFooter("U/D PAGE", "A REF", "B BACK");
         for (int row = 0; row < 6; row++) previousStatusValues[row] = "";
     }
 
@@ -206,7 +206,7 @@ void DisplayManager::renderPowerScreen() {
         tft.print(subtitles[item]);
     }
 
-    drawModernFooter("U/D SEL", "R OK", "B BACK");
+    drawModernFooter("U/D SEL", "A OK", "B BACK");
 }
 
 void DisplayManager::renderShutdownScreen() {
@@ -223,7 +223,7 @@ void DisplayManager::renderShutdownScreen() {
     tft.print("SHUTTING DOWN");
     tft.setCursor(29, 78);
     tft.setTextColor(ST77XX_GRAY, SPECTRUM_CARD_BG);
-    tft.print("Hold RIGHT to wake");
+    tft.print("Hold A to wake");
     tft.setCursor(45, 110);
     tft.setTextColor(SPECTRUM_ACCENT, ST77XX_BLACK);
     tft.print("DEEP SLEEP");
