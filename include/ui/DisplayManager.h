@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
+#include <FS.h>
 #include "config/Config.h"
 #include "core/AppState.h"
 
@@ -49,6 +50,21 @@ private:
     size_t fileSelection = 0;
     String filePath = "/";
     String fileStatus;
+    File videoFile;
+    String videoName;
+    uint16_t videoWidth = 0;
+    uint16_t videoHeight = 0;
+    uint8_t videoFps = 0;
+    uint32_t videoFrameCount = 0;
+    uint32_t videoFrame = 0;
+    uint32_t videoNextFrameMs = 0;
+    bool videoLayoutDrawn = false;
+    uint16_t videoLine[152] = {};
+    File photoFile;
+    uint16_t photoWidth = 0;
+    uint16_t photoHeight = 0;
+    size_t photoExplorerIndex = 0;
+    bool photoNeedsDraw = false;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -130,6 +146,8 @@ private:
     void renderRfEnvironmentScreen();
     void renderLuaScriptsScreen();
     void renderFileExplorerScreen();
+    void renderVideoPlayer();
+    void renderPhotoViewer();
     void renderRebootScreen();
     void renderShutdownScreen();
 
@@ -145,6 +163,12 @@ private:
     void drawModernFooter(const char* left, const char* middle, const char* right);
     void drawFooterChip(int x, int width, const char* label);
     void loadFileExplorerDirectory();
+    bool openVideo(const String& path);
+    void closeVideo();
+    void skipVideo(uint32_t seconds);
+    bool openPhoto(size_t explorerIndex);
+    bool changePhoto(int direction);
+    void closePhoto();
     uint16_t luaGuiColor(const char* name) const;
 };
 

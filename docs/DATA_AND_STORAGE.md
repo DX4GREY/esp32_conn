@@ -14,6 +14,28 @@
 
 See [Persistence](PERSISTENCE.md) for NVS details.
 
+## SD media playback
+
+File Explorer supports lightweight RFSuite media formats inside the protected
+152×86 display area:
+
+- `.rfv`: uncompressed RGB565 video, 1–30 FPS. `A` skips ten seconds and `B`
+  closes the player.
+- `.rfi`: one RGB565 photo. `UP` opens the next photo in the current folder,
+  `DOWN` opens the previous photo, and `B` closes the viewer.
+
+Convert regular media using FFmpeg and the included tools:
+
+```text
+python3 tools/rfv_convert.py input.mp4 output.rfv --fps 10
+python3 tools/rfi_convert.py input.jpg output.rfi
+```
+
+Copy the converted files anywhere on the SD card and open them with `A` from
+`SD FILES`. Aspect ratio is preserved with black padding. Audio, MP4, JPEG,
+and PNG decoding are intentionally performed on the computer rather than the
+ESP32 to keep firmware RAM and flash use low.
+
 ## Starting and stopping recording
 
 Start from Analyze → Logging with `A`, or over Serial:

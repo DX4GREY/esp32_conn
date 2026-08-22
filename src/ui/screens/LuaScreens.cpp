@@ -194,3 +194,155 @@ void DisplayManager::renderFileExplorerScreen() {
     }
     drawModernFooter("B UP/BACK", "UP/DN", "A OPEN");
 }
+
+namespace {
+constexpr uint32_t RFV_HEADER_SIZE = 14;
+
+bool readExact(File& file, void* destination, size_t length) {
+    return file.read(static_cast<uint8_t*>(destination), length) ==
+           static_cast<int>(length);
+}
+}
+
+bool DisplayManager::openVideo(const String& path) {
+    closeVideo();
+    videoFile = storageManager.filesystem().open(path, FILE_READ);
+    if (!videoFile) return false;
+
+    char magic[4];
+    uint8_t reserved = 0;
+    if (!readExact(videoFile, magic, sizeof(magic)) || memcmp(magic, "RFV1", 4) != 0 ||
+        !readExact(videoFile, &videoWidth, sizeof(videoWidth)) ||
+        !readExact(videoFile, &videoHeight, sizeof(videoHeight)) ||
+        !readExact(videoFile, &videoFps, sizeof(videoFps)) ||
+        !readExact(videoFile, &reserved, sizeof(reserved)) ||
+        !readExact(videoFile, &videoFrameCount, sizeof(videoFrameCount)) ||
+        videoWidth == 0 || videoWidth > 152 || videoHeight == 0 || videoHeight > 86 ||
+        videoFps == 0 || videoFps > 30 || videoFrameCount == 0) {
+        closeVideo();
+        return false;
+    }
+    const uint64_t expected = RFV_HEADER_SIZE +
+        static_cast<uint64_t>(videoWidth) * videoHeight * 2U * videoFrameCount;
+    if (videoFile.size() < expected) { closeVideo(); return false; }
+
+    videoName = path.substring(path.lastIndexOf('/') + 1);
+    videoFrame = 0;
+    videoNextFrameMs = 0;
+    videoLayoutDrawn = false;
+    return true;
+}
+
+void DisplayManager::closeVideo() {
+    if (videoFile) videoFile.close();
+    videoWidth = videoHeight = 0; videoFps = 0;
+    videoFrameCount = videoFrame = 0; videoLayoutDrawn = false;
+}
+
+void DisplayManager::skipVideo(uint32_t seconds) {
+    if (!videoFile || !videoFrameCount) return;
+    const uint32_t advance = static_cast<uint32_t>(videoFps) * seconds;
+    videoFrame = min(videoFrame + advance, videoFrameCount - 1);
+    videoNextFrameMs = 0;
+}
+
+void DisplayManager::renderVideoPlayer() {
+    if (!videoFile) {
+        appState.appMode = APP_MODE_FILE_EXPLORER;
+        needRedraw = true;
+        return;
+    }
+    if (!videoLayoutDrawn) {
+        drawModernHeader("SD VIDEO", SPECTRUM_ACCENT);
+        tft.fillRect(3, 16, 154, 88, ST77XX_BLACK);
+        tft.drawRect(2, 15, 156, 90, SPECTRUM_BORDER);
+        drawModernFooter("B BACK", "", "A +10S");
+        videoLayoutDrawn = true;
+    }
+    const uint32_t now = millis();
+    if (videoNextFrameMs && static_cast<int32_t>(now - videoNextFrameMs) < 0) return;
+
+    const uint32_t frameBytes = static_cast<uint32_t>(videoWidth) * videoHeight * 2U;
+    if (!videoFile.seek(RFV_HEADER_SIZE + frameBytes * videoFrame)) {
+        fileStatus = "VIDEO SEEK ERROR"; closeVideo(); return;
+    }
+    const int x = 4 + (152 - videoWidth) / 2;
+    const int y = 17 + (86 - videoHeight) / 2;
+    for (uint16_t row = 0; row < videoHeight; ++row) {
+        if (!readExact(videoFile, videoLine, videoWidth * sizeof(uint16_t))) {
+            fileStatus = "VIDEO READ ERROR"; closeVideo(); return;
+        }
+        tft.drawRGBBitmap(x, y + row, videoLine, videoWidth, 1);
+    }
+    videoFrame = (videoFrame + 1) % videoFrameCount;
+    videoNextFrameMs = now + max<uint32_t>(1, 1000U / videoFps);
+}
+
+bool DisplayManager::openPhoto(size_t explorerIndex) {
+    if (explorerIndex >= fileEntryCount || fileDirectories[explorerIndex]) return false;
+    String lowerName = fileNames[explorerIndex]; lowerName.toLowerCase();
+    if (!lowerName.endsWith(".rfi")) return false;
+
+    closePhoto();
+    String path = filePath;
+    if (path != "/") path += "/";
+    path += fileNames[explorerIndex];
+    photoFile = storageManager.filesystem().open(path, FILE_READ);
+    char magic[4];
+    if (!photoFile || !readExact(photoFile, magic, sizeof(magic)) ||
+        memcmp(magic, "RFI1", 4) != 0 ||
+        !readExact(photoFile, &photoWidth, sizeof(photoWidth)) ||
+        !readExact(photoFile, &photoHeight, sizeof(photoHeight)) ||
+        photoWidth == 0 || photoWidth > 152 || photoHeight == 0 || photoHeight > 86 ||
+        photoFile.size() < 8U + static_cast<uint32_t>(photoWidth) * photoHeight * 2U) {
+        closePhoto();
+        return false;
+    }
+    photoExplorerIndex = explorerIndex;
+    photoNeedsDraw = true;
+    return true;
+}
+
+bool DisplayManager::changePhoto(int direction) {
+    if (!fileEntryCount) return false;
+    size_t candidate = photoExplorerIndex;
+    for (size_t checked = 0; checked < fileEntryCount; ++checked) {
+        candidate = direction > 0
+            ? (candidate + 1) % fileEntryCount
+            : (candidate + fileEntryCount - 1) % fileEntryCount;
+        String name = fileNames[candidate]; name.toLowerCase();
+        if (!fileDirectories[candidate] && name.endsWith(".rfi") && openPhoto(candidate))
+            return true;
+    }
+    return false;
+}
+
+void DisplayManager::closePhoto() {
+    if (photoFile) photoFile.close();
+    photoWidth = photoHeight = 0;
+    photoNeedsDraw = false;
+}
+
+void DisplayManager::renderPhotoViewer() {
+    if (!photoFile) {
+        appState.appMode = APP_MODE_FILE_EXPLORER;
+        needRedraw = true;
+        return;
+    }
+    if (!photoNeedsDraw) return;
+    drawModernHeader("SD PHOTO", SPECTRUM_ACCENT);
+    tft.fillRect(3, 16, 154, 88, ST77XX_BLACK);
+    tft.drawRect(2, 15, 156, 90, SPECTRUM_BORDER);
+    drawModernFooter("B CLOSE", "D PREV", "U NEXT");
+    if (!photoFile.seek(8)) { closePhoto(); return; }
+
+    const int x = 4 + (152 - photoWidth) / 2;
+    const int y = 17 + (86 - photoHeight) / 2;
+    for (uint16_t row = 0; row < photoHeight; ++row) {
+        if (!readExact(photoFile, videoLine, photoWidth * sizeof(uint16_t))) {
+            closePhoto(); return;
+        }
+        tft.drawRGBBitmap(x, y + row, videoLine, photoWidth, 1);
+    }
+    photoNeedsDraw = false;
+}

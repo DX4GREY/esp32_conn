@@ -144,6 +144,14 @@ void DisplayManager::updateUI() {
         case APP_MODE_FILE_EXPLORER:
             if (needRedraw) { renderFileExplorerScreen(); needRedraw = false; }
             break;
+        case APP_MODE_VIDEO_PLAYER:
+            renderVideoPlayer();
+            needRedraw = false;
+            break;
+        case APP_MODE_PHOTO_VIEWER:
+            renderPhotoViewer();
+            needRedraw = false;
+            break;
         case APP_MODE_REBOOT:
             renderRebootScreen();   // di-render tiap frame agar animasi titik hidup
             break;
@@ -562,7 +570,19 @@ void DisplayManager::processInput() {
                 filePath += fileNames[fileSelection];
                 fileEntryCount = 0; fileSelection = 0; fileStatus = "";
             } else {
-                fileStatus = String(fileSizes[fileSelection]) + " bytes";
+                String lowerName = fileNames[fileSelection]; lowerName.toLowerCase();
+                if (lowerName.endsWith(".rfv")) {
+                    String path = filePath;
+                    if (path != "/") path += "/";
+                    path += fileNames[fileSelection];
+                    if (openVideo(path)) appState.appMode = APP_MODE_VIDEO_PLAYER;
+                    else fileStatus = "INVALID RFV VIDEO";
+                } else if (lowerName.endsWith(".rfi")) {
+                    if (openPhoto(fileSelection)) appState.appMode = APP_MODE_PHOTO_VIEWER;
+                    else fileStatus = "INVALID RFI PHOTO";
+                } else {
+                    fileStatus = String(fileSizes[fileSelection]) + " bytes";
+                }
             }
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
@@ -573,6 +593,27 @@ void DisplayManager::processInput() {
                 filePath = slash <= 0 ? "/" : filePath.substring(0, slash);
                 fileEntryCount = 0; fileSelection = 0; fileStatus = "";
             }
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_VIDEO_PLAYER) {
+        if (buttonManager.isPressed(BTN_A)) {
+            skipVideo(10);
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            closeVideo();
+            appState.appMode = APP_MODE_FILE_EXPLORER;
+            needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_PHOTO_VIEWER) {
+        if (buttonManager.isPressed(BTN_UP)) {
+            changePhoto(1); needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN)) {
+            changePhoto(-1); needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            closePhoto();
+            appState.appMode = APP_MODE_FILE_EXPLORER;
             needRedraw = true;
         }
     }
