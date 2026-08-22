@@ -7,6 +7,8 @@
 #include "services/RfEnvironmentAnalyzer.h"
 #include "core/RfEnvironmentState.h"
 #include "ui/DisplayManager.h"
+#include "services/Watchdog.h"
+#include "config/Config.h"
 #include <FS.h>
 
 extern "C" {
@@ -145,6 +147,11 @@ const char* optionalColor(lua_State* state, int index) {
     return lua_gettop(state) >= index ? luaL_checkstring(state, index) : "white";
 }
 int rfGuiBegin(lua_State* state) { displayManager.luaGuiBegin(luaL_optstring(state, 1, "LUA GUI")); return 0; }
+int rfGuiFooter(lua_State* state) {
+    displayManager.luaGuiFooter(luaL_optstring(state, 1, ""),
+                                luaL_optstring(state, 2, ""),
+                                luaL_optstring(state, 3, "")); return 0;
+}
 int rfGuiClear(lua_State*) { displayManager.luaGuiClear(); return 0; }
 int rfGuiText(lua_State* state) {
     displayManager.luaGuiText(luaL_checkinteger(state, 1), luaL_checkinteger(state, 2),
@@ -168,6 +175,21 @@ int rfGuiCircle(lua_State* state) {
     displayManager.luaGuiCircle(luaL_checkinteger(state, 1), luaL_checkinteger(state, 2),
                                 luaL_checkinteger(state, 3), optionalColor(state, 4),
                                 lua_toboolean(state, 5)); return 0;
+}
+int rfButton(lua_State* state) {
+    String name = luaL_checkstring(state, 1); name.toLowerCase();
+    int pin = -1;
+    if (name == "up") pin = BTN_UP;
+    else if (name == "down") pin = BTN_DOWN;
+    else if (name == "a" || name == "right") pin = BTN_A;
+    else if (name == "b" || name == "left") pin = BTN_B;
+    else return luaL_error(state, "button must be up, down, a, or b");
+    lua_pushboolean(state, digitalRead(pin) == LOW); return 1;
+}
+int rfDelay(lua_State* state) {
+    const int duration = luaL_checkinteger(state, 1);
+    luaL_argcheck(state, duration >= 0 && duration <= 1000, 1, "delay must be 0..1000 ms");
+    watchdog.feed(); delay(duration); watchdog.feed(); return 0;
 }
 
 int rfLabStart(lua_State* state) {
@@ -252,12 +274,15 @@ bool LuaEngine::run(const String& requestedName, Stream& output) {
     lua_pushcfunction(state, rfEnvironment); lua_setfield(state, -2, "environment");
     lua_pushcfunction(state, rfOpen); lua_setfield(state, -2, "open_screen");
     lua_pushcfunction(state, rfGuiBegin); lua_setfield(state, -2, "gui_begin");
+    lua_pushcfunction(state, rfGuiFooter); lua_setfield(state, -2, "gui_footer");
     lua_pushcfunction(state, rfGuiClear); lua_setfield(state, -2, "gui_clear");
     lua_pushcfunction(state, rfGuiText); lua_setfield(state, -2, "gui_text");
     lua_pushcfunction(state, rfGuiPixel); lua_setfield(state, -2, "gui_pixel");
     lua_pushcfunction(state, rfGuiLine); lua_setfield(state, -2, "gui_line");
     lua_pushcfunction(state, rfGuiRect); lua_setfield(state, -2, "gui_rect");
     lua_pushcfunction(state, rfGuiCircle); lua_setfield(state, -2, "gui_circle");
+    lua_pushcfunction(state, rfButton); lua_setfield(state, -2, "button");
+    lua_pushcfunction(state, rfDelay); lua_setfield(state, -2, "delay");
     lua_pushcfunction(state, rfLabStart); lua_setfield(state, -2, "lab_start");
     lua_pushcfunction(state, rfLabStop); lua_setfield(state, -2, "lab_stop");
     lua_setglobal(state, "rf");

@@ -14,7 +14,7 @@ Format the card as FAT16 or FAT32. At boot the firmware creates these folders:
 ```
 
 Copy plain-text Lua 5.1 files into `/RFSuite/scripts/`. A script is limited to
-32 KiB. The TFT browser displays up to 16 scripts, sorted by filename.
+32 KiB. The TFT browser displays up to 32 scripts, sorted by filename.
 
 ## Running a script from the TFT
 
@@ -92,12 +92,15 @@ frame.
 | Function | Behavior |
 |---|---|
 | `rf.gui_begin(title)` | Open and clear a firmware-framed Lua GUI |
+| `rf.gui_footer(left,middle,right)` | Set three firmware footer labels |
 | `rf.gui_clear()` | Clear only the Lua canvas |
 | `rf.gui_text(x,y,text,color)` | Draw clipped single-line text |
 | `rf.gui_pixel(x,y,color)` | Draw one pixel |
 | `rf.gui_line(x0,y0,x1,y1,color)` | Draw a clipped line |
 | `rf.gui_rect(x,y,w,h,color,filled)` | Draw an outline or filled rectangle |
 | `rf.gui_circle(x,y,r,color,filled)` | Draw an outline or filled circle |
+| `rf.button("up"|"down"|"a"|"b")` | Read an active-low button during a script |
+| `rf.delay(milliseconds)` | Yield for `0..1000` ms and feed the watchdog |
 
 Colors are `white`, `black`, `gray`, `accent`/`cyan`, `green`, `yellow`,
 `orange`, and `red`. Color arguments are optional and default to white. On a
@@ -128,6 +131,7 @@ Ready-to-copy scripts are available in `examples/lua/`:
 | `09_environment_start.lua` | Start passive environment sampling |
 | `10_channel_inspect.lua` | Freeze and inspect the current peak channel |
 | `30_custom_gui.lua` | Render a custom RF dashboard inside the firmware frame |
+| `40_snake_game.lua` | Interactive Snake using all four hardware buttons |
 | `90_api_self_test.lua` | Validate status, spectrum, levels, and range checks |
 | `91_control_self_test.lua` | Test cursor/freeze controls and invalid arguments |
 | `92_integration_self_test.lua` | Test SD logging and environment start/stop |

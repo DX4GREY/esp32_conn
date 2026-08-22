@@ -102,6 +102,16 @@ void DisplayManager::luaGuiBegin(const char* title) {
     drawModernFooter("B LIST", "", "A RERUN");
 }
 
+void DisplayManager::luaGuiFooter(const char* left, const char* middle, const char* right) {
+    String l = left ? String(left) : String();
+    String m = middle ? String(middle) : String();
+    String r = right ? String(right) : String();
+    if (l.length() > 7) l.remove(7);
+    if (m.length() > 7) m.remove(7);
+    if (r.length() > 7) r.remove(7);
+    drawModernFooter(l.c_str(), m.c_str(), r.c_str());
+}
+
 void DisplayManager::luaGuiClear() {
     tft.fillRect(4, 17, 152, 86, ST77XX_BLACK);
 }

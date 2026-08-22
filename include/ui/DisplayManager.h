@@ -16,6 +16,7 @@ public:
     void showSplash();
     void prepareForShutdown();
     void luaGuiBegin(const char* title);
+    void luaGuiFooter(const char* left, const char* middle, const char* right);
     void luaGuiClear();
     void luaGuiText(int x, int y, const char* text, const char* color);
     void luaGuiPixel(int x, int y, const char* color);
@@ -34,7 +35,7 @@ private:
     uint8_t envEventScroll = 0;
     uint8_t envBandChannel = 42;
     uint8_t probeSelection = 0;
-    static constexpr size_t LUA_UI_MAX_SCRIPTS = 16;
+    static constexpr size_t LUA_UI_MAX_SCRIPTS = 32;
     String luaScripts[LUA_UI_MAX_SCRIPTS];
     size_t luaScriptCount = 0;
     size_t luaScriptSelection = 0;
