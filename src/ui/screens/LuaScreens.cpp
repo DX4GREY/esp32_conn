@@ -39,15 +39,18 @@ void DisplayManager::renderLuaScriptsScreen() {
                 row += c;
             }
         }
-        const size_t first = rowCount > 8 ? rowCount - 8 : 0;
-        for (size_t i = first; i < rowCount; ++i) {
+        const size_t maxScroll = rowCount > 8 ? rowCount - 8 : 0;
+        const size_t scroll = min<size_t>(luaOutputScroll, maxScroll);
+        const size_t end = rowCount - scroll;
+        const size_t first = end > 8 ? end - 8 : 0;
+        for (size_t i = first; i < end; ++i) {
             tft.setCursor(5, 31 + static_cast<int>(i - first) * 9);
             tft.setTextColor(luaRunStatus.startsWith("ERROR")
                                  ? SPECTRUM_CRITICAL : ST77XX_WHITE,
                              ST77XX_BLACK);
             tft.print(rows[i]);
         }
-        drawModernFooter("B LIST", "", "A RERUN");
+        drawModernFooter("B LIST", "U/D SCR", "A RERUN");
         return;
     }
     if (!luaScriptCount && luaRunStatus.length() == 0) {

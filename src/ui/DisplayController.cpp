@@ -231,7 +231,8 @@ void DisplayManager::processInput() {
             }
             if (feature.mode == APP_MODE_LUA_SCRIPTS) {
                 luaScriptCount = 0; luaScriptSelection = 0; luaRunStatus = "";
-                luaOutput = ""; luaShowingOutput = false; luaShowingGui = false;
+                luaOutput = ""; luaShowingOutput = false; luaOutputScroll = 0;
+                luaShowingGui = false;
             }
             if (feature.mode == APP_MODE_FILE_EXPLORER) {
                 filePath = "/"; fileEntryCount = 0; fileSelection = 0;
@@ -520,7 +521,13 @@ void DisplayManager::processInput() {
         }
     }
     else if (appState.appMode == APP_MODE_LUA_SCRIPTS) {
-        if (!luaShowingOutput && !luaShowingGui &&
+        if (luaShowingOutput && buttonManager.isPressed(BTN_UP)) {
+            luaOutputScroll = min<uint8_t>(24, luaOutputScroll + 1);
+            needRedraw = true;
+        } else if (luaShowingOutput && buttonManager.isPressed(BTN_DOWN)) {
+            if (luaOutputScroll) --luaOutputScroll;
+            needRedraw = true;
+        } else if (!luaShowingOutput && !luaShowingGui &&
             buttonManager.isPressed(BTN_UP) && luaScriptCount) {
             luaScriptSelection = (luaScriptSelection + luaScriptCount - 1) % luaScriptCount;
             luaRunStatus = ""; needRedraw = true;
@@ -535,6 +542,7 @@ void DisplayManager::processInput() {
                 luaRunStatus = luaScriptCount ? "SCRIPTS REFRESHED" : luaEngine.lastError();
             } else {
                 luaShowingGui = false;
+                luaOutputScroll = 0;
                 LuaDisplayStream output(luaOutput);
                 const bool ok = luaEngine.run(luaScripts[luaScriptSelection], output);
                 luaRunStatus = ok ? "SCRIPT COMPLETED" : String("ERROR: ") + luaEngine.lastError();
@@ -550,7 +558,7 @@ void DisplayManager::processInput() {
         } else if (buttonManager.isPressed(BTN_B)) {
             if (luaShowingOutput || luaShowingGui) {
                 luaShowingOutput = false; luaShowingGui = false;
-                luaOutput = ""; luaRunStatus = "";
+                luaOutputScroll = 0; luaOutput = ""; luaRunStatus = "";
             } else {
                 luaRunStatus = ""; appState.appMode = APP_MODE_MENU;
             }

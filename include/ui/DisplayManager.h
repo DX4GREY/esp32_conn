@@ -41,6 +41,7 @@ private:
     String luaRunStatus;
     String luaOutput;
     bool luaShowingOutput = false;
+    uint8_t luaOutputScroll = 0;
     bool luaShowingGui = false;
     static constexpr size_t FILE_UI_MAX_ENTRIES = 32;
     String fileNames[FILE_UI_MAX_ENTRIES];
