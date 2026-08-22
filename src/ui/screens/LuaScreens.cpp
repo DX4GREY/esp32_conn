@@ -8,6 +8,48 @@
 using namespace DisplayUi;
 
 void DisplayManager::renderLuaScriptsScreen() {
+    if (luaShowingGui) return;
+    if (luaShowingOutput) {
+        drawModernHeader("LUA OUTPUT", SPECTRUM_ACCENT);
+        tft.fillRect(0, 15, 160, 90, ST77XX_BLACK);
+        String script = luaScripts[luaScriptSelection];
+        if (script.length() > 24) script = script.substring(0, 23) + "~";
+        tft.setCursor(5, 18);
+        tft.setTextColor(ST77XX_GRAY, ST77XX_BLACK);
+        tft.print(script);
+
+        // Wrap captured output to 25 characters and keep the final nine rows,
+        // where summaries and errors normally appear.
+        String rows[32];
+        size_t rowCount = 0;
+        String row;
+        for (size_t i = 0; i <= luaOutput.length(); ++i) {
+            if (i == luaOutput.length() && !row.length()) break;
+            const char c = i < luaOutput.length() ? luaOutput[i] : '\n';
+            if (c == '\r') continue;
+            if (c == '\n' || row.length() >= 25) {
+                if (rowCount < 32) rows[rowCount++] = row;
+                else {
+                    for (size_t j = 1; j < 32; ++j) rows[j - 1] = rows[j];
+                    rows[31] = row;
+                }
+                row = "";
+                if (c != '\n') row += c;
+            } else {
+                row += c;
+            }
+        }
+        const size_t first = rowCount > 8 ? rowCount - 8 : 0;
+        for (size_t i = first; i < rowCount; ++i) {
+            tft.setCursor(5, 31 + static_cast<int>(i - first) * 9);
+            tft.setTextColor(luaRunStatus.startsWith("ERROR")
+                                 ? SPECTRUM_CRITICAL : ST77XX_WHITE,
+                             ST77XX_BLACK);
+            tft.print(rows[i]);
+        }
+        drawModernFooter("B LIST", "", "A RERUN");
+        return;
+    }
     if (!luaScriptCount && luaRunStatus.length() == 0) {
         luaScriptCount = luaEngine.listScripts(luaScripts, LUA_UI_MAX_SCRIPTS);
         luaScriptSelection = 0;

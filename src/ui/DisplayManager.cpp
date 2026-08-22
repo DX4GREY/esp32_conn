@@ -81,6 +81,71 @@ void DisplayManager::prepareForShutdown() {
     tft.enableSleep(true);
 }
 
+uint16_t DisplayManager::luaGuiColor(const char* name) const {
+    String value = name ? String(name) : String("white");
+    value.toLowerCase();
+    if (value == "accent" || value == "cyan") return SPECTRUM_ACCENT;
+    if (value == "green" || value == "low") return SPECTRUM_LOW;
+    if (value == "yellow" || value == "mid") return SPECTRUM_MID;
+    if (value == "orange" || value == "high") return SPECTRUM_HIGH;
+    if (value == "red" || value == "critical") return SPECTRUM_CRITICAL;
+    if (value == "gray" || value == "grey") return ST77XX_GRAY;
+    if (value == "black") return ST77XX_BLACK;
+    return ST77XX_WHITE;
+}
+
+void DisplayManager::luaGuiBegin(const char* title) {
+    luaShowingGui = true;
+    drawModernHeader(title && title[0] ? title : "LUA GUI", SPECTRUM_ACCENT);
+    tft.fillRect(3, 16, 154, 88, ST77XX_BLACK);
+    tft.drawRect(2, 15, 156, 90, SPECTRUM_BORDER);
+    drawModernFooter("B LIST", "", "A RERUN");
+}
+
+void DisplayManager::luaGuiClear() {
+    tft.fillRect(4, 17, 152, 86, ST77XX_BLACK);
+}
+
+void DisplayManager::luaGuiText(int x, int y, const char* text, const char* color) {
+    x = constrain(x, 0, 151); y = constrain(y, 0, 85);
+    const int maxChars = max(0, (152 - x) / 6);
+    String shown = text ? String(text) : String();
+    shown.replace("\n", " "); shown.replace("\r", " ");
+    if (shown.length() > static_cast<size_t>(maxChars)) shown.remove(maxChars);
+    tft.setTextSize(1); tft.setTextWrap(false);
+    tft.setTextColor(luaGuiColor(color), ST77XX_BLACK);
+    tft.setCursor(4 + x, 17 + y); tft.print(shown);
+}
+
+void DisplayManager::luaGuiPixel(int x, int y, const char* color) {
+    if (x < 0 || x >= 152 || y < 0 || y >= 86) return;
+    tft.drawPixel(4 + x, 17 + y, luaGuiColor(color));
+}
+
+void DisplayManager::luaGuiLine(int x0, int y0, int x1, int y1, const char* color) {
+    x0 = constrain(x0, 0, 151); x1 = constrain(x1, 0, 151);
+    y0 = constrain(y0, 0, 85); y1 = constrain(y1, 0, 85);
+    tft.drawLine(4 + x0, 17 + y0, 4 + x1, 17 + y1, luaGuiColor(color));
+}
+
+void DisplayManager::luaGuiRect(int x, int y, int width, int height,
+                                const char* color, bool filled) {
+    x = constrain(x, 0, 151); y = constrain(y, 0, 85);
+    width = constrain(width, 1, 152 - x); height = constrain(height, 1, 86 - y);
+    if (filled) tft.fillRect(4 + x, 17 + y, width, height, luaGuiColor(color));
+    else tft.drawRect(4 + x, 17 + y, width, height, luaGuiColor(color));
+}
+
+void DisplayManager::luaGuiCircle(int x, int y, int radius,
+                                  const char* color, bool filled) {
+    x = constrain(x, 0, 151); y = constrain(y, 0, 85);
+    const int maxRadius = min(min(x, 151 - x), min(y, 85 - y));
+    if (maxRadius < 1) return;
+    radius = constrain(radius, 1, maxRadius);
+    if (filled) tft.fillCircle(4 + x, 17 + y, radius, luaGuiColor(color));
+    else tft.drawCircle(4 + x, 17 + y, radius, luaGuiColor(color));
+}
+
 // =============================================================================
 // SPLASH SCREEN (SHOWN BEFORE THE MAIN MENU)
 // =============================================================================

@@ -14,6 +14,13 @@ public:
     void requestRedraw();
     void showSplash();
     void prepareForShutdown();
+    void luaGuiBegin(const char* title);
+    void luaGuiClear();
+    void luaGuiText(int x, int y, const char* text, const char* color);
+    void luaGuiPixel(int x, int y, const char* color);
+    void luaGuiLine(int x0, int y0, int x1, int y1, const char* color);
+    void luaGuiRect(int x, int y, int width, int height, const char* color, bool filled);
+    void luaGuiCircle(int x, int y, int radius, const char* color, bool filled);
 
 private:
     Adafruit_ST7735 tft;
@@ -31,6 +38,9 @@ private:
     size_t luaScriptCount = 0;
     size_t luaScriptSelection = 0;
     String luaRunStatus;
+    String luaOutput;
+    bool luaShowingOutput = false;
+    bool luaShowingGui = false;
     static constexpr size_t FILE_UI_MAX_ENTRIES = 32;
     String fileNames[FILE_UI_MAX_ENTRIES];
     uint32_t fileSizes[FILE_UI_MAX_ENTRIES] = {};
@@ -135,6 +145,7 @@ private:
     void drawModernFooter(const char* left, const char* middle, const char* right);
     void drawFooterChip(int x, int width, const char* label);
     void loadFileExplorerDirectory();
+    uint16_t luaGuiColor(const char* name) const;
 };
 
 extern DisplayManager displayManager;

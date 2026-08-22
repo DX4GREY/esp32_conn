@@ -82,6 +82,27 @@ an error instead of permanently blocking the UI.
 `rf.open_screen(name)` changes to one of `spectrum`, `waterfall`, `inspect`,
 `survey`, `events`, `logging`, `status`, or `menu` after the script finishes.
 
+### Custom TFT GUI
+
+Lua can draw inside a protected 152×86 pixel canvas. The firmware retains its
+header, border, and button footer. Canvas coordinates start at `(0, 0)` in the
+top-left content area and are clipped so scripts cannot overwrite the firmware
+frame.
+
+| Function | Behavior |
+|---|---|
+| `rf.gui_begin(title)` | Open and clear a firmware-framed Lua GUI |
+| `rf.gui_clear()` | Clear only the Lua canvas |
+| `rf.gui_text(x,y,text,color)` | Draw clipped single-line text |
+| `rf.gui_pixel(x,y,color)` | Draw one pixel |
+| `rf.gui_line(x0,y0,x1,y1,color)` | Draw a clipped line |
+| `rf.gui_rect(x,y,w,h,color,filled)` | Draw an outline or filled rectangle |
+| `rf.gui_circle(x,y,r,color,filled)` | Draw an outline or filled circle |
+
+Colors are `white`, `black`, `gray`, `accent`/`cyan`, `green`, `yellow`,
+`orange`, and `red`. Color arguments are optional and default to white. On a
+Lua GUI, press `A` to rerun the script and `B` to return to the script list.
+
 ### Controlled-lab RF functions
 
 `rf.lab_start(target)` and `rf.lab_stop()` mirror the firmware's controlled-lab
@@ -106,6 +127,7 @@ Ready-to-copy scripts are available in `examples/lua/`:
 | `08_stop_recording.lua` | Stop CSV recording |
 | `09_environment_start.lua` | Start passive environment sampling |
 | `10_channel_inspect.lua` | Freeze and inspect the current peak channel |
+| `30_custom_gui.lua` | Render a custom RF dashboard inside the firmware frame |
 | `90_api_self_test.lua` | Validate status, spectrum, levels, and range checks |
 | `91_control_self_test.lua` | Test cursor/freeze controls and invalid arguments |
 | `92_integration_self_test.lua` | Test SD logging and environment start/stop |

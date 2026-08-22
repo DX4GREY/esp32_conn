@@ -9,6 +9,27 @@
 #include "services/LuaEngine.h"
 #include "services/StorageManager.h"
 
+namespace {
+class LuaDisplayStream : public Stream {
+public:
+    explicit LuaDisplayStream(String& captured) : buffer(captured) { buffer = ""; }
+
+    size_t write(uint8_t value) override {
+        Serial.write(value);
+        buffer += static_cast<char>(value);
+        if (buffer.length() > 1024) buffer.remove(0, buffer.length() - 1024);
+        return 1;
+    }
+    int available() override { return 0; }
+    int read() override { return -1; }
+    int peek() override { return -1; }
+    void flush() override { Serial.flush(); }
+
+private:
+    String& buffer;
+};
+}
+
 void DisplayManager::updateUI() {
     const int currentMode = static_cast<int>(appState.appMode);
     if (renderedMode != currentMode) {
@@ -202,6 +223,7 @@ void DisplayManager::processInput() {
             }
             if (feature.mode == APP_MODE_LUA_SCRIPTS) {
                 luaScriptCount = 0; luaScriptSelection = 0; luaRunStatus = "";
+                luaOutput = ""; luaShowingOutput = false; luaShowingGui = false;
             }
             if (feature.mode == APP_MODE_FILE_EXPLORER) {
                 filePath = "/"; fileEntryCount = 0; fileSelection = 0;
@@ -490,10 +512,12 @@ void DisplayManager::processInput() {
         }
     }
     else if (appState.appMode == APP_MODE_LUA_SCRIPTS) {
-        if (buttonManager.isPressed(BTN_UP) && luaScriptCount) {
+        if (!luaShowingOutput && !luaShowingGui &&
+            buttonManager.isPressed(BTN_UP) && luaScriptCount) {
             luaScriptSelection = (luaScriptSelection + luaScriptCount - 1) % luaScriptCount;
             luaRunStatus = ""; needRedraw = true;
-        } else if (buttonManager.isPressed(BTN_DOWN) && luaScriptCount) {
+        } else if (!luaShowingOutput && !luaShowingGui &&
+                   buttonManager.isPressed(BTN_DOWN) && luaScriptCount) {
             luaScriptSelection = (luaScriptSelection + 1) % luaScriptCount;
             luaRunStatus = ""; needRedraw = true;
         } else if (buttonManager.isPressed(BTN_A)) {
@@ -502,12 +526,27 @@ void DisplayManager::processInput() {
                 luaScriptSelection = 0;
                 luaRunStatus = luaScriptCount ? "SCRIPTS REFRESHED" : luaEngine.lastError();
             } else {
-                const bool ok = luaEngine.run(luaScripts[luaScriptSelection], Serial);
+                luaShowingGui = false;
+                LuaDisplayStream output(luaOutput);
+                const bool ok = luaEngine.run(luaScripts[luaScriptSelection], output);
                 luaRunStatus = ok ? "SCRIPT COMPLETED" : String("ERROR: ") + luaEngine.lastError();
+                if (!ok) {
+                    luaShowingGui = false;
+                    if (luaOutput.length() && !luaOutput.endsWith("\n")) luaOutput += "\n";
+                    luaOutput += luaRunStatus;
+                }
+                if (!luaOutput.length()) luaOutput = luaRunStatus;
+                luaShowingOutput = !ok || !luaShowingGui;
             }
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_B)) {
-            luaRunStatus = ""; appState.appMode = APP_MODE_MENU; needRedraw = true;
+            if (luaShowingOutput || luaShowingGui) {
+                luaShowingOutput = false; luaShowingGui = false;
+                luaOutput = ""; luaRunStatus = "";
+            } else {
+                luaRunStatus = ""; appState.appMode = APP_MODE_MENU;
+            }
+            needRedraw = true;
         }
     }
     else if (appState.appMode == APP_MODE_FILE_EXPLORER) {
