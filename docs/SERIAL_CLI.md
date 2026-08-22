@@ -21,6 +21,10 @@ pio device monitor --baud 115200
 
 Factory reset does not delete `/rf_session.csv` from LittleFS.
 
+When an SD card is mounted, session data instead lives at
+`/RFSuite/log/rf_session.csv`. `lua list` lists SD scripts and
+`lua run <name>` executes `/RFSuite/scripts/<name>.lua` in the restricted VM.
+
 ## Analyzer commands
 
 | Command | Valid values | Behavior |

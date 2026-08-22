@@ -30,6 +30,18 @@
 #define TFT_RST   15
 #define TFT_CS    14
 
+// microSD slot on the TFT module. Most ST7735+SD boards share CLK/MOSI with
+// the display and expose separate SD_MISO and SD_CS pins. Override these with
+// PlatformIO build_flags when your carrier board is wired differently.
+#ifndef SD_CS_PIN
+#define SD_CS_PIN   3
+#endif
+#ifndef SD_MISO_PIN
+#define SD_MISO_PIN 21
+#endif
+#define SD_SCK_PIN  TFT_SCK
+#define SD_MOSI_PIN TFT_SDA
+
 // Navigation Buttons (Active LOW / Internal Pull-Up)
 #define BTN_UP    10
 #define BTN_RIGHT 9

@@ -2,30 +2,30 @@
 #include "core/AppState.h"
 #include "core/RfEnvironmentState.h"
 #include "drivers/RadioManager.h"
-#include <LittleFS.h>
+#include "services/StorageManager.h"
 
 SessionRecorder sessionRecorder;
 
 namespace {
-constexpr const char* SESSION_PATH = "/rf_session.csv";
 constexpr size_t MAX_SESSION_BYTES = 256U * 1024U;
 constexpr size_t FLUSH_THRESHOLD = 3072;
 constexpr unsigned long FLUSH_INTERVAL_MS = 2000;
 }
 
 bool SessionRecorder::begin() {
-    ready = LittleFS.begin(true);
-    errorMessage = ready ? "none" : "LittleFS mount failed";
+    ready = storageManager.begin();
+    errorMessage = ready ? "none" : "SD and LittleFS mount failed";
     return ready;
 }
 
 bool SessionRecorder::start() {
     if (!ready) {
-        errorMessage = "LittleFS unavailable";
+        errorMessage = "storage unavailable";
         return false;
     }
-    LittleFS.remove(SESSION_PATH);
-    File file = LittleFS.open(SESSION_PATH, FILE_WRITE);
+    fs::FS& fs = storageManager.filesystem();
+    fs.remove(storageManager.sessionPath());
+    File file = fs.open(storageManager.sessionPath(), FILE_WRITE);
     if (!file) {
         errorMessage = "cannot create session";
         return false;
@@ -53,7 +53,7 @@ void SessionRecorder::stop() {
 
 bool SessionRecorder::flushPending() {
     if (!ready || pending.length() == 0) return ready;
-    File file = LittleFS.open(SESSION_PATH, FILE_APPEND);
+    File file = storageManager.filesystem().open(storageManager.sessionPath(), FILE_APPEND);
     if (!file) {
         errorMessage = "session append failed";
         recording = false;
@@ -119,8 +119,9 @@ void SessionRecorder::recordProbeSummary(uint8_t channel,uint8_t pa,uint8_t rate
 
 bool SessionRecorder::exportCsv(Stream& output) {
     flushPending();
-    if (!ready || !LittleFS.exists(SESSION_PATH)) return false;
-    File file = LittleFS.open(SESSION_PATH, FILE_READ);
+    fs::FS& fs = storageManager.filesystem();
+    if (!ready || !fs.exists(storageManager.sessionPath())) return false;
+    File file = fs.open(storageManager.sessionPath(), FILE_READ);
     if (!file) return false;
     while (file.available()) output.write(file.read());
     file.close();
@@ -129,8 +130,9 @@ bool SessionRecorder::exportCsv(Stream& output) {
 
 bool SessionRecorder::replayLatest(AppState& state) {
     flushPending();
-    if (!ready || !LittleFS.exists(SESSION_PATH)) return false;
-    File file = LittleFS.open(SESSION_PATH, FILE_READ);
+    fs::FS& fs = storageManager.filesystem();
+    if (!ready || !fs.exists(storageManager.sessionPath())) return false;
+    File file = fs.open(storageManager.sessionPath(), FILE_READ);
     if (!file) return false;
     String lastData;
     while (file.available()) {
@@ -163,10 +165,14 @@ bool SessionRecorder::replayLatest(AppState& state) {
 }
 
 size_t SessionRecorder::fileSize() const {
-    if (!ready || !LittleFS.exists(SESSION_PATH)) return 0;
-    File file = LittleFS.open(SESSION_PATH, FILE_READ);
+    fs::FS& fs = storageManager.filesystem();
+    if (!ready || !fs.exists(storageManager.sessionPath())) return 0;
+    File file = fs.open(storageManager.sessionPath(), FILE_READ);
     if (!file) return 0;
     const size_t size = file.size();
     file.close();
     return size;
 }
+
+const char* SessionRecorder::storageName() const { return storageManager.backendName(); }
+const char* SessionRecorder::path() const { return storageManager.sessionPath(); }

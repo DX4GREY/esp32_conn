@@ -149,7 +149,7 @@ Use `UP/DOWN` to change page, `RIGHT` to refresh, and `B` to return.
 3. **Radio / Software**: R1/R2 connection, scan mode, build mode, ESP-IDF, build date.
 4. **Performance**: average/maximum sweep time, UI average, loop rate, SPI wait, session state.
 
-`SESSION STOPPED` means the LittleFS recorder is not currently active. It does not mean that the analyzer, filesystem, or device has failed. Start it from Analyze → Logging or with `session start`.
+`SESSION STOPPED` means the SD/LittleFS recorder is not currently active. It does not mean that the analyzer, filesystem, or device has failed. Start it from Analyze → Logging or with `session start`.
 
 ### Power
 

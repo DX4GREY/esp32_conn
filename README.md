@@ -93,6 +93,11 @@ Place each decoupling capacitor as close as possible to the corresponding radio'
 | VCC | Match the module, typically 3.3 V |
 | GND | GND |
 
+For a TFT module with a microSD slot, connect the slot's `SD_CS` to GPIO 3 and
+`SD_MISO` to GPIO 21. The slot shares `SCK` (GPIO 18) and `MOSI` (GPIO 17) with
+the display. Override `SD_CS_PIN` and `SD_MISO_PIN` in `build_flags` if your
+board uses different wiring. Use a FAT16/FAT32-formatted card.
+
 The firmware initializes the display with `INITR_BLACKTAB` and rotation `3`. If colors, offsets, or orientation are incorrect, check the panel variant in `DisplayManager::init()`.
 
 ### Navigation buttons
@@ -263,9 +268,21 @@ If only one module is detected, requests that require the missing receiver trans
 
 The selected profile and CUSTOM sample count are stored in NVS.
 
-## Session recording and CSV logging
+## Session recording, SD card, and Lua scripting
 
-Open `Analyze → Logging` to start a new session. The previous `/rf_session.csv` is replaced, full 126-channel sweeps are buffered to LittleFS, and a compact summary is printed at 115200 baud:
+At boot, the firmware mounts the TFT microSD slot and creates `/RFSuite/log/`
+and `/RFSuite/scripts/`. Open `Analyze → Logging` to start a new session. On SD,
+the previous `/RFSuite/log/rf_session.csv` is replaced. If no usable card is
+present, recording transparently falls back to LittleFS `/rf_session.csv`.
+
+Lua 5.1 scripts (maximum 32 KiB) can be placed in `/RFSuite/scripts/`, listed
+with `lua list`, and executed with `lua run NAME`. The sandbox exposes
+`rf.millis()`, `rf.peak_channel()`, `rf.level(channel)`, and `rf.log(message)`;
+the last function appends to `/RFSuite/log/lua.log`. File/OS/package loading is
+disabled and each run has an instruction limit. See
+`examples/lua/channel_report.lua` for a minimal example.
+The complete API and TFT loading workflow are documented in
+[`docs/LUA_SCRIPTING.md`](docs/LUA_SCRIPTING.md).
 
 ```text
 RFLOG,<timestamp_ms>,<sweep>,<peak_channel>,<peak_percent>,<band>,<radio_mode>,<trace>,<confidence>

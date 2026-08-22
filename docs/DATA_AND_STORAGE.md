@@ -5,7 +5,8 @@
 | Data | Location | Survives reboot | Notes |
 |---|---|---:|---|
 | User configuration | NVS namespace `appstate` | Yes | Versioned schema and deferred writes |
-| Latest recorded session | LittleFS `/rf_session.csv` | Yes | Replaced when a new session starts |
+| Latest recorded session | SD `/RFSuite/log/rf_session.csv`, LittleFS fallback `/rf_session.csv` | Yes | Replaced when a new session starts |
+| Lua application log | SD `/RFSuite/log/lua.log` | Yes | Appended by `rf.log()` |
 | Live, AVG, MAX, baseline | RAM | No | DELTA baseline is deliberately temporary |
 | Waterfall, survey, analyzer events | RAM | No | Rebuilt from new sweeps |
 | RF-environment statistics, heatmap, bursts, snapshots | RAM | No | Configuration is persisted, measurements are not |
@@ -21,7 +22,7 @@ Start from Analyze → Logging with `RIGHT`, or over Serial:
 session start
 ```
 
-Starting recording removes the previous `/rf_session.csv` and creates a new v1 header. Stop with `RIGHT` on the Logging page or:
+Starting recording removes the previous session CSV on the active storage backend and creates a new v1 header. Stop with `RIGHT` on the Logging page or:
 
 ```text
 session stop

@@ -26,6 +26,11 @@ private:
     uint8_t envEventScroll = 0;
     uint8_t envBandChannel = 42;
     uint8_t probeSelection = 0;
+    static constexpr size_t LUA_UI_MAX_SCRIPTS = 16;
+    String luaScripts[LUA_UI_MAX_SCRIPTS];
+    size_t luaScriptCount = 0;
+    size_t luaScriptSelection = 0;
+    String luaRunStatus;
     bool needRedraw = true;
     unsigned long lastStatusFlash = 0;
     bool flashState = false;
@@ -105,6 +110,7 @@ private:
     void renderStatusScreen();
     void renderPowerScreen();
     void renderRfEnvironmentScreen();
+    void renderLuaScriptsScreen();
     void renderRebootScreen();
     void renderShutdownScreen();
 

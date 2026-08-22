@@ -27,6 +27,7 @@
 #include "services/SessionRecorder.h"
 #include "services/PerformanceMonitor.h"
 #include "services/RfEnvironmentAnalyzer.h"
+#include "services/LuaEngine.h"
 
 static constexpr unsigned long WAKE_HOLD_MS = 1500;
 
@@ -87,6 +88,7 @@ void setup() {
     if (!sessionRecorder.begin()) {
         Serial.println("Session recorder unavailable: " + String(sessionRecorder.lastError()));
     }
+    if (!luaEngine.begin()) Serial.println("Lua: " + String(luaEngine.lastError()));
 
     // 2. Initialize Navigation Buttons (Pull-Up)
     buttonManager.init();

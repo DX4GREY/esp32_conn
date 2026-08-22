@@ -40,6 +40,18 @@ The firmware configures this shared bus for SPI mode 0, MSB first, at 16 MHz. A 
 | VCC | Appropriate panel supply, normally 3.3 V |
 | GND | GND |
 
+### TFT microSD slot
+
+| Module signal | ESP32-S3 GPIO |
+|---|---:|
+| SD SCK | 18 (shared with TFT) |
+| SD MOSI | 17 (shared with TFT) |
+| SD MISO | 21 |
+| SD CS | 3 |
+
+The SD controller uses HSPI so it does not contend with the RF24 FSPI bus.
+Pins can be overridden with `SD_CS_PIN` and `SD_MISO_PIN` build flags.
+
 The display is initialized as `INITR_BLACKTAB` with rotation `3`. Different ST7735 panel variants may require a different initialization tab, color order, offset, or rotation.
 
 ## Button wiring

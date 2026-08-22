@@ -45,7 +45,8 @@ The first `RIGHT` press captures Before; the next captures After. Each snapshot
 contains average and peak activity, peak channel, relative score, burst count,
 and all 126 channel occupancies. Snapshots remain in RAM and disappear after a
 restart or factory reset. If session recording is active, a compact `E` summary
-is also appended to `/rf_session.csv`.
+is also appended to the active session CSV (SD `/RFSuite/log/rf_session.csv`
+or LittleFS fallback `/rf_session.csv`).
 
 ## Band Info limitations
 

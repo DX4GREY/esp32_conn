@@ -23,6 +23,8 @@ public:
     size_t fileSize() const;
     uint32_t recordedSweeps() const { return sweepCount; }
     const char* lastError() const { return errorMessage; }
+    const char* storageName() const;
+    const char* path() const;
 
 private:
     bool flushPending();

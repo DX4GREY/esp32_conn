@@ -6,6 +6,7 @@
 #include "services/RfEnvironmentAnalyzer.h"
 #include "core/RfEnvironmentState.h"
 #include "services/RfAuthorizedProbe.h"
+#include "services/LuaEngine.h"
 
 void DisplayManager::updateUI() {
     const int currentMode = static_cast<int>(appState.appMode);
@@ -115,6 +116,9 @@ void DisplayManager::updateUI() {
                 renderRfEnvironmentScreen(); lastEnvRenderMs = millis(); needRedraw = false;
             }
             break;
+        case APP_MODE_LUA_SCRIPTS:
+            if (needRedraw) { renderLuaScriptsScreen(); needRedraw = false; }
+            break;
         case APP_MODE_REBOOT:
             renderRebootScreen();   // di-render tiap frame agar animasi titik hidup
             break;
@@ -191,6 +195,9 @@ void DisplayManager::processInput() {
             }
             if (feature.openFlags & MENU_OPEN_RESET_INSPECTOR) {
                 appState.inspectedPeak = 0;
+            }
+            if (feature.mode == APP_MODE_LUA_SCRIPTS) {
+                luaScriptCount = 0; luaScriptSelection = 0; luaRunStatus = "";
             }
             appState.appMode = feature.mode;
             needRedraw = true;
@@ -472,6 +479,27 @@ void DisplayManager::processInput() {
             else if (appState.appMode == APP_MODE_ENV_BEFORE_AFTER) envBandChannel = envBandChannel ? envBandChannel - 1 : 0;
             else if (appState.appMode == APP_MODE_ENV_BURSTS && envEventScroll) envEventScroll--;
             needRedraw = true;
+        }
+    }
+    else if (appState.appMode == APP_MODE_LUA_SCRIPTS) {
+        if (buttonManager.isPressed(BTN_UP) && luaScriptCount) {
+            luaScriptSelection = (luaScriptSelection + luaScriptCount - 1) % luaScriptCount;
+            luaRunStatus = ""; needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_DOWN) && luaScriptCount) {
+            luaScriptSelection = (luaScriptSelection + 1) % luaScriptCount;
+            luaRunStatus = ""; needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_RIGHT)) {
+            if (!luaScriptCount) {
+                luaScriptCount = luaEngine.listScripts(luaScripts, LUA_UI_MAX_SCRIPTS);
+                luaScriptSelection = 0;
+                luaRunStatus = luaScriptCount ? "SCRIPTS REFRESHED" : luaEngine.lastError();
+            } else {
+                const bool ok = luaEngine.run(luaScripts[luaScriptSelection], Serial);
+                luaRunStatus = ok ? "SCRIPT COMPLETED" : String("ERROR: ") + luaEngine.lastError();
+            }
+            needRedraw = true;
+        } else if (buttonManager.isPressed(BTN_B)) {
+            luaRunStatus = ""; appState.appMode = APP_MODE_MENU; needRedraw = true;
         }
     }
     else if (appState.appMode == APP_MODE_POWER) {

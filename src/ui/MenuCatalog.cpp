@@ -33,23 +33,28 @@ constexpr MenuFeature FEATURES[MenuCatalog::FEATURE_COUNT] = {
 #else
     ,{"RX ONLY",  APP_MODE_ENV_PROBE,          6, MENU_OPEN_STOP_RADIOS}
 #endif
+    ,{"LUA SCRIPTS",APP_MODE_LUA_SCRIPTS,      9, MENU_OPEN_STOP_RADIOS}
 };
 
 constexpr const char* PAGE_TITLES[MenuCatalog::PAGE_COUNT] = {
     "ANALYZE",
     "TOOLS",
     "ENV TEST",
-    "ENV MORE"
+    "ENV MORE",
+    "SCRIPTING"
 };
 
-constexpr uint8_t PAGE_ITEM_COUNTS[MenuCatalog::PAGE_COUNT] = {6, 6, 6, 2};
+constexpr uint8_t PAGE_ITEM_COUNTS[MenuCatalog::PAGE_COUNT] = {6, 6, 6, 2, 1};
 
 }  // namespace
 
 namespace MenuCatalog {
 
 int featureIndex(int page, int slot) {
-    return page * ITEMS_PER_PAGE + slot;
+    page = constrain(page, 0, PAGE_COUNT - 1);
+    int index = slot;
+    for (int i = 0; i < page; ++i) index += PAGE_ITEM_COUNTS[i];
+    return index;
 }
 
 const MenuFeature& featureAt(int page, int slot) {

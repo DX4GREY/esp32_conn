@@ -119,7 +119,7 @@ Completed sweeps update all shared analyzer products once: waterfall, occupancy,
 
 - high-rate acquisition and histories live only in RAM;
 - compact preferences are validated and deferred to NVS;
-- complete recorded sweeps are buffered to LittleFS.
+- complete recorded sweeps are buffered to SD, with LittleFS as fallback.
 
 The Core 0 lab task reads volatile test state and updates volatile active-channel fields. The Core 1 UI snapshots those fields before deriving displayed frequencies so a channel/frequency pair remains internally consistent.
 

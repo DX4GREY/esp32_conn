@@ -8,6 +8,7 @@
 #include "core/RfEnvironmentState.h"
 #include "core/RfEnvironmentMath.h"
 #include "services/RfAuthorizedProbe.h"
+#include "services/LuaEngine.h"
 
 namespace {
 bool parseIntStrict(const String& text, int& value) {
@@ -175,12 +176,21 @@ void SerialCommander::executeCommand(String cmd) {
                 Serial.println("Last recorded sweep loaded and frozen.");
             } else Serial.println("No replayable session available.");
         } else {
-            Serial.printf("Session: %s, %lu sweeps, %u bytes, error=%s\n",
+            Serial.printf("Session: %s, %lu sweeps, %u bytes, storage=%s, path=%s, error=%s\n",
                           sessionRecorder.isRecording() ? "RECORDING" : "STOPPED",
                           static_cast<unsigned long>(sessionRecorder.recordedSweeps()),
                           static_cast<unsigned>(sessionRecorder.fileSize()),
+                          sessionRecorder.storageName(), sessionRecorder.path(),
                           sessionRecorder.lastError());
         }
+    }
+    else if (lowerCmd == "lua" || lowerCmd == "lua list") {
+        luaEngine.list(Serial);
+    }
+    else if (lowerCmd.startsWith("lua run ")) {
+        const String name = cmd.substring(8);
+        Serial.println(luaEngine.run(name, Serial) ? "Lua script completed." :
+                       "Lua failed: " + String(luaEngine.lastError()));
     }
     else if (lowerCmd == "perf") {
         const PerformanceSnapshot perf = performanceMonitor.snapshot();
@@ -344,7 +354,8 @@ void SerialCommander::printHelp() {
     Serial.println("baseline      - Capture baseline and select delta trace");
     Serial.println("max clear     - Clear maximum history");
     Serial.println("event <key> <value> - threshold/hysteresis/duration/channels");
-    Serial.println("session <start|stop|info|export|replay> - LittleFS recorder");
+    Serial.println("session <start|stop|info|export|replay> - SD recorder (LittleFS fallback)");
+    Serial.println("lua <list|run NAME> - Run sandboxed /RFSuite/scripts/*.lua");
     Serial.println("perf          - Runtime scan/UI/SPI timing diagnostics");
     Serial.println("env help      - RF Environment Test commands");
     Serial.println("factory reset confirm - Restore persistent defaults and reboot");
