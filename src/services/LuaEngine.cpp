@@ -71,7 +71,10 @@ int rfStatus(lua_State* state) {
 }
 
 int rfSetCursor(lua_State* state) {
-    appState.setCursorChannel(luaL_checkinteger(state, 1), false);
+    const int channel = luaL_checkinteger(state, 1);
+    luaL_argcheck(state, channel >= MIN_CHANNEL && channel <= MAX_CHANNEL,
+                  1, "channel must be 0..125");
+    appState.setCursorChannel(channel, false);
     return 0;
 }
 

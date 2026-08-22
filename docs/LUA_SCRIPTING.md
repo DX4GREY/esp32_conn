@@ -92,6 +92,48 @@ same build-time safety boundary as the native firmware feature.
 
 ## Examples
 
+Ready-to-copy scripts are available in `examples/lua/`:
+
+| Script | Purpose |
+|---|---|
+| `01_status_report.lua` | Print radio, sweep, peak, and recorder status |
+| `02_top_channels.lua` | Rank the ten busiest channels |
+| `03_wifi_report.lua` | Summarize and log activity in channels 1–73 |
+| `04_threshold_alert.lua` | Print and log channels above a threshold |
+| `05_watch_busy.lua` | Mark the five busiest channels for watching |
+| `06_delta_setup.lua` | Capture a baseline and open the DELTA trace |
+| `07_start_recording.lua` | Start CSV recording and open Logging |
+| `08_stop_recording.lua` | Stop CSV recording |
+| `09_environment_start.lua` | Start passive environment sampling |
+| `10_channel_inspect.lua` | Freeze and inspect the current peak channel |
+| `90_api_self_test.lua` | Validate status, spectrum, levels, and range checks |
+| `91_control_self_test.lua` | Test cursor/freeze controls and invalid arguments |
+| `92_integration_self_test.lua` | Test SD logging and environment start/stop |
+| `93_rf_lab_self_test.lua` | Test authorized RF start/stop and target validation |
+
+Copy the desired files to `/RFSuite/scripts/` on the SD card.
+
+### Running the Lua self-tests
+
+Copy the three `9x_*_self_test.lua` files to `/RFSuite/scripts/`, then run them
+from the TFT or Serial:
+
+```text
+lua run 90_api_self_test
+lua run 91_control_self_test
+lua run 92_integration_self_test
+```
+
+Each test prints individual `PASS`/`FAIL` lines followed by a summary. The API
+test is read-only. The control test temporarily changes cursor/freeze state and
+restores it. The integration test appends a marker to `lua.log` and briefly
+starts/stops passive environment sampling when it was not already running.
+
+The RF lab self-test must only be run in a shielded, explicitly authorized RF
+setup with the `authorized_rf_lab` firmware. It starts the Wi-Fi lab target and
+stops it immediately, then verifies that an invalid target is rejected. On the
+normal `analyzer` build it prints `SKIP`; active RF remains compiled out.
+
 Read a full spectrum and log channels above 70%:
 
 ```lua
