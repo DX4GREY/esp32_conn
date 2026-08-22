@@ -29,11 +29,13 @@ bool StorageManager::begin() {
     digitalWrite(SD_CS_PIN, HIGH);
     sdSpi.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     sdMounted = SD.begin(SD_CS_PIN, sdSpi, 10000000U) && SD.cardType() != CARD_NONE;
+    sdState = sdMounted ? "mounted" : "not detected";
     if (sdMounted) {
         if (!ensureDirectory(SD, "/RFSuite/log") ||
             !ensureDirectory(SD, "/RFSuite/scripts")) {
             SD.end();
             sdMounted = false;
+            sdState = "directory error";
         }
     }
 
@@ -42,6 +44,24 @@ bool StorageManager::begin() {
     Serial.printf("Storage: %s%s\n", backendName(),
                   sdMounted ? " mounted at /RFSuite" : " fallback");
     return sdMounted || flashMounted;
+}
+
+const char* StorageManager::sdTypeName() const {
+    if (!sdMounted) return "NONE";
+    switch (SD.cardType()) {
+        case CARD_MMC: return "MMC";
+        case CARD_SD: return "SDSC";
+        case CARD_SDHC: return "SDHC/SDXC";
+        default: return "UNKNOWN";
+    }
+}
+
+uint64_t StorageManager::sdTotalBytes() const { return sdMounted ? SD.totalBytes() : 0; }
+uint64_t StorageManager::sdUsedBytes() const { return sdMounted ? SD.usedBytes() : 0; }
+uint64_t StorageManager::sdFreeBytes() const {
+    const uint64_t total = sdTotalBytes();
+    const uint64_t used = sdUsedBytes();
+    return total > used ? total - used : 0;
 }
 
 fs::FS& StorageManager::filesystem() {

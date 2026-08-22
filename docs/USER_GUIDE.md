@@ -151,6 +151,12 @@ Use `UP/DOWN` to change page, `RIGHT` to refresh, and `B` to return.
 
 `SESSION STOPPED` means the SD/LittleFS recorder is not currently active. It does not mean that the analyzer, filesystem, or device has failed. Start it from Analyze → Logging or with `session start`.
 
+`SYS INFO` page 5, `SD CARD`, shows whether the card was loaded, card type,
+capacity, used and free space, plus the active recorder backend. `NOT DETECTED`
+with recorder `LittleFS` means no usable card was found; `DIRECTORY ERROR`
+means the card mounted but the required RFSuite folders could not be prepared.
+In both cases the firmware uses its flash fallback.
+
 ### Power
 
 Choose Restart or Shutdown with `UP/DOWN`, confirm with `RIGHT`, or cancel with `B`.

@@ -9,6 +9,7 @@
 #include "core/RfEnvironmentMath.h"
 #include "services/RfAuthorizedProbe.h"
 #include "services/LuaEngine.h"
+#include "services/StorageManager.h"
 
 namespace {
 bool parseIntStrict(const String& text, int& value) {
@@ -333,6 +334,11 @@ void SerialCommander::printStatus() {
     Serial.println("Peak RF   : Channel " + String(appState.peakChannel) + " (" + String(appState.peakLevel) + "%)");
     Serial.printf("Confidence: %u%% (%s)\n", appState.analyzerConfidence,
                   appState.analyzerFrozen ? "FROZEN" : "LIVE");
+    Serial.printf("SD Card   : %s, type=%s, total=%llu, used=%llu, free=%llu bytes\n",
+                  storageManager.sdStatus(), storageManager.sdTypeName(),
+                  storageManager.sdTotalBytes(), storageManager.sdUsedBytes(),
+                  storageManager.sdFreeBytes());
+    Serial.printf("Recorder  : %s (%s)\n", sessionRecorder.storageName(), sessionRecorder.path());
     Serial.println("=== END STATUS ===\n");
 }
 

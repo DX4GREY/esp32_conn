@@ -426,10 +426,10 @@ void DisplayManager::processInput() {
     // -------------------------------------------------------------------------
     else if (appState.appMode == APP_MODE_STATUS) {
         if (buttonManager.isPressed(BTN_UP)) {
-            statusPage = (statusPage + 3) % 4;
+            statusPage = (statusPage + 4) % 5;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_DOWN)) {
-            statusPage = (statusPage + 1) % 4;
+            statusPage = (statusPage + 1) % 5;
             needRedraw = true;
         } else if (buttonManager.isPressed(BTN_RIGHT)) {
             lastStatusRenderMs = 0;

@@ -11,11 +11,17 @@ public:
     const char* scriptsPath() const { return "/RFSuite/scripts"; }
     bool usingSd() const { return sdMounted; }
     const char* backendName() const { return sdMounted ? "SD" : "LittleFS"; }
+    const char* sdStatus() const { return sdState; }
+    const char* sdTypeName() const;
+    uint64_t sdTotalBytes() const;
+    uint64_t sdUsedBytes() const;
+    uint64_t sdFreeBytes() const;
 
 private:
     bool ensureDirectory(fs::FS& fs, const char* path);
     bool sdMounted = false;
     bool flashMounted = false;
+    const char* sdState = "not initialized";
 };
 
 extern StorageManager storageManager;

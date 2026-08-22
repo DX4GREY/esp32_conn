@@ -3,8 +3,23 @@
 #include "drivers/RadioManager.h"
 #include "services/PerformanceMonitor.h"
 #include "services/SessionRecorder.h"
+#include "services/StorageManager.h"
 
 using namespace DisplayUi;
+
+namespace {
+String formatStorageBytes(uint64_t bytes) {
+    constexpr uint64_t KB = 1024ULL;
+    constexpr uint64_t MB = KB * 1024ULL;
+    constexpr uint64_t GB = MB * 1024ULL;
+    if (bytes >= GB) return String(static_cast<unsigned long>(bytes / GB)) + "." +
+        String(static_cast<unsigned long>((bytes % GB) * 10ULL / GB)) + " GB";
+    if (bytes >= MB) return String(static_cast<unsigned long>(bytes / MB)) + "." +
+        String(static_cast<unsigned long>((bytes % MB) * 10ULL / MB)) + " MB";
+    if (bytes >= KB) return String(static_cast<unsigned long>(bytes / KB)) + " KB";
+    return String(static_cast<unsigned long>(bytes)) + " B";
+}
+}
 
 void DisplayManager::renderSettingsScreen() {
     if (!settingsLayoutDrawn) {
@@ -53,7 +68,7 @@ void DisplayManager::renderSettingsScreen() {
 // =============================================================================
 void DisplayManager::renderStatusScreen() {
     static const char* pageTitles[] = {
-        "DEVICE INFO", "MEMORY INFO", "RADIO / SW", "PERFORMANCE"
+        "DEVICE INFO", "MEMORY INFO", "RADIO / SW", "PERFORMANCE", "SD CARD"
     };
     const char* labels[6];
     String values[6];
@@ -98,7 +113,7 @@ void DisplayManager::renderStatusScreen() {
         colors[1] = radio2Ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
         colors[2] = SPECTRUM_ACCENT;
         colors[3] = SPECTRUM_HIGH;
-    } else {
+    } else if (statusPage == 3) {
         const PerformanceSnapshot perf = performanceMonitor.snapshot();
         labels[0] = "SWEEP AVG"; values[0] = String(perf.averageSweepUs / 1000.0f, 1) + " ms";
         labels[1] = "SWEEP MAX"; values[1] = String(perf.maxSweepUs / 1000.0f, 1) + " ms";
@@ -113,6 +128,18 @@ void DisplayManager::renderStatusScreen() {
         colors[2] = SPECTRUM_LOW;
         colors[4] = radioManager.getBusTimeouts() == 0 ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
         colors[5] = sessionRecorder.isRecording() ? SPECTRUM_CRITICAL : ST77XX_GRAY;
+    } else {
+        const bool mounted = storageManager.usingSd();
+        labels[0] = "STATUS";   values[0] = storageManager.sdStatus(); values[0].toUpperCase();
+        labels[1] = "CARD TYPE"; values[1] = storageManager.sdTypeName();
+        labels[2] = "CAPACITY"; values[2] = mounted ? formatStorageBytes(storageManager.sdTotalBytes()) : "--";
+        labels[3] = "USED";     values[3] = mounted ? formatStorageBytes(storageManager.sdUsedBytes()) : "--";
+        labels[4] = "FREE";     values[4] = mounted ? formatStorageBytes(storageManager.sdFreeBytes()) : "--";
+        labels[5] = "RECORDER"; values[5] = storageManager.backendName();
+        colors[0] = mounted ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
+        colors[1] = mounted ? SPECTRUM_ACCENT : ST77XX_GRAY;
+        colors[2] = colors[3] = colors[4] = mounted ? ST77XX_WHITE : ST77XX_GRAY;
+        colors[5] = mounted ? SPECTRUM_LOW : SPECTRUM_HIGH;
     }
 
     const bool layoutChanged = renderedStatusPage != statusPage;
@@ -122,7 +149,7 @@ void DisplayManager::renderStatusScreen() {
         tft.setCursor(139, 3);
         tft.setTextColor(SPECTRUM_ACCENT, SPECTRUM_BORDER);
         tft.print(statusPage + 1);
-        tft.print("/4");
+        tft.print("/5");
         tft.fillRoundRect(5, 17, 150, 86, 4, SPECTRUM_CARD_BG);
         tft.drawRoundRect(5, 17, 150, 86, 4, SPECTRUM_BORDER);
         drawModernFooter("U/D PAGE", "R REF", "B BACK");
