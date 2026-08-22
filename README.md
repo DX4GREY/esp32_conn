@@ -144,6 +144,24 @@ The default environment is intentionally receive-only:
 default_envs = analyzer
 ```
 
+## Versioning and releases
+
+The current firmware version is stored in `VERSION` and exposed in the device's
+**System Status → Radio / SW** page. Releases use semantic tags such as `v1.0.0`.
+
+To publish a release, first update `VERSION` and `APP_VERSION` to the same
+semantic version, commit the change, then push its matching tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release workflow validates the tag, runs native tests, builds the safe
+receive-only `analyzer` profile, uploads its `.bin` file and SHA-256 checksum,
+and generates release notes from commits and merged pull requests since the
+previous release.
+
 Available environments:
 
 | Environment | Purpose | Build command |

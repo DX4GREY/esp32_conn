@@ -1,0 +1,71 @@
+name: Firmware Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Validate release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          project_version="$(tr -d '[:space:]' < VERSION)"
+          header_version="$(sed -n 's/^#define APP_VERSION "\([^"]*\)"/\1/p' include/config/Config.h)"
+          if [[ ! "$tag_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must use semantic versioning, for example v1.0.0."
+            exit 1
+          fi
+          if [[ "$tag_version" != "$project_version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION ($project_version)."
+            exit 1
+          fi
+          if [[ "$project_version" != "$header_version" ]]; then
+            echo "VERSION ($project_version) does not match APP_VERSION ($header_version)."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Run native unit tests
+        run: pio test -e native
+
+      - name: Build release firmware
+        run: pio run -e analyzer
+
+      - name: Prepare release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .pio/build/analyzer/firmware.bin "rf24-suite-${GITHUB_REF_NAME}-analyzer.bin"
+          sha256sum "rf24-suite-${GITHUB_REF_NAME}-analyzer.bin" > SHA256SUMS.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          "rf24-suite-${GITHUB_REF_NAME}-analyzer.bin"
+          SHA256SUMS.txt
+          --verify-tag
+          --title "RF24 Suite $GITHUB_REF_NAME"
+          --generate-notes

@@ -2,6 +2,12 @@
 #include <Arduino.h>
 #include <RF24.h>
 
+// Keep this value in sync with the root VERSION file. Release builds verify
+// that the Git tag matches it before publishing any firmware.
+#ifndef APP_VERSION
+#define APP_VERSION "1.0.0"
+#endif
+
 // Analyzer-only is the safe default. The controlled-lab PlatformIO profile
 // explicitly sets this to 1 to compile active RF test functionality.
 #ifndef RF_LAB_TX_ENABLED

@@ -104,6 +104,12 @@ Before tagging or distributing firmware:
 7. Record RAM and flash use.
 8. Review the diff for accidental credentials, generated files, or unsafe default changes.
 
+Pushing a semantic version tag such as `v1.0.0` runs
+`.github/workflows/release.yml`. The tag must match both `VERSION` and
+`APP_VERSION`. The workflow publishes only the receive-only `analyzer` binary,
+its SHA-256 checksum, and automatically generated notes covering changes since
+the previous GitHub release.
+
 ## Adding tests
 
 Put dependency-free logic behind small functions in `include/core/AnalyzerMath.h` or another pure header/module. Add focused cases under `test/<suite-name>/`. For hardware code, prefer a documented on-device test procedure unless a mock provides meaningful behavior rather than merely increasing coverage.

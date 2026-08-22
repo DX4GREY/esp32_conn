@@ -108,7 +108,7 @@ void DisplayManager::renderStatusScreen() {
         labels[2] = "SCAN MODE"; values[2] = appState.getAnalyzerRadioModeName();
         labels[3] = "BUILD MODE"; values[3] = radioManager.transmitFeaturesEnabled() ? "RF LAB" : "RX ONLY";
         labels[4] = "ESP-IDF";    values[4] = ESP.getSdkVersion();
-        labels[5] = "FW BUILD";   values[5] = __DATE__;
+        labels[5] = "FIRMWARE";   values[5] = "v" APP_VERSION;
         colors[0] = radio1Ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
         colors[1] = radio2Ok ? SPECTRUM_LOW : SPECTRUM_CRITICAL;
         colors[2] = SPECTRUM_ACCENT;
